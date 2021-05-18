@@ -20,7 +20,8 @@ from torch.utils.data import DataLoader
 
 from logicnets.nn import    generate_truth_tables, \
                             lut_inference, \
-                            module_list_to_verilog_module
+                            module_list_to_verilog_module, \
+                            load_histograms
 
 from train import configs, model_config, dataset_config, other_options, test
 from dataset import JetSubstructureDataset
@@ -55,6 +56,10 @@ if __name__ == "__main__":
         help="A location to store the log output of the training run and the output model (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, required=True,
         help="The checkpoint file which contains the model weights")
+    parser.add_argument('--histograms', type=str, required=True,
+        help="The checkpoint histograms of LUT usage")
+    parser.add_argument('--freq-thresh', type=int, default=0,
+        help="Threshold to use to include this truth table into the model (default: %(default)s)")
     args = parser.parse_args()
     defaults = configs[args.arch]
     options = vars(args)
@@ -118,13 +123,15 @@ if __name__ == "__main__":
                     'test_accuracy': lut_accuracy}
 
     torch.save(modelSave, options_cfg["log_dir"] + "/lut_based_model.pth")
+    luts = torch.load(args.histograms)
+    load_histograms(lut_model, luts)
 
     print("Generating verilog in %s..." % (options_cfg["log_dir"]))
-    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"])
+    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], freq_thresh=args.freq_thresh)
     print("Top level entity stored at: %s/logicnet.v ..." % (options_cfg["log_dir"]))
 
     print("Running inference simulation of Verilog-based model...")
-    lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v")
+    lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v", verify=args.freq_thresh == 0)
     verilog_accuracy = test(lut_model, test_loader, cuda=False)
     print("Verilog-Based Model accuracy: %f" % (verilog_accuracy))
 
