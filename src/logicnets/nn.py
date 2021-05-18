@@ -74,6 +74,12 @@ def save_luts(model: nn.Module, path: str) -> None:
     torch.save(lut_dict, path)
 
 # TODO: Create a container module which performs this function.
+def load_histograms(model: nn.Module, lut_dict: dict) -> None:
+    for name, module in model.named_modules():
+        if name in lut_dict.keys():
+            module.used_luts_histogram = lut_dict[name]['histogram']
+
+# TODO: Create a container module which performs this function.
 def neq_inference(model: nn.Module) -> None:
     for name, module in model.named_modules():
         if type(module) == SparseLinearNeq:
@@ -81,7 +87,7 @@ def neq_inference(model: nn.Module) -> None:
 
 # TODO: Should this go in with the other verilog functions?
 # TODO: Support non-linear topologies
-def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, output_directory: str):
+def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, output_directory: str, freq_thresh=None):
     input_bitwidth = None
     output_bitwidth = None
     module_contents = ""
@@ -89,7 +95,7 @@ def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, 
         m = module_list[i]
         if type(m) == SparseLinearNeq:
             module_prefix = f"layer{i}"
-            module_input_bits, module_output_bits = m.gen_layer_verilog(module_prefix, output_directory)
+            module_input_bits, module_output_bits = m.gen_layer_verilog(module_prefix, output_directory, freq_thresh=freq_thresh)
             if i == 0:
                 input_bitwidth = module_input_bits
             elif i == len(module_list)-1:
@@ -141,7 +147,7 @@ class SparseLinearNeq(nn.Module):
     # TODO: Move the verilog string templates to elsewhere
     # TODO: Move this to another class
     # TODO: Update this code to support custom bitwidths per input/output
-    def gen_layer_verilog(self, module_prefix, directory):
+    def gen_layer_verilog(self, module_prefix, directory, freq_thresh=None):
         _, input_bitwidth = self.input_quant.get_scale_factor_bits()
         _, output_bitwidth = self.output_quant.get_scale_factor_bits()
         input_bitwidth, output_bitwidth = int(input_bitwidth), int(output_bitwidth)
@@ -152,7 +158,7 @@ class SparseLinearNeq(nn.Module):
         for index in range(self.out_features):
             module_name = f"{module_prefix}_N{index}"
             indices, _, _, _ = self.neuron_truth_tables[index]
-            neuron_verilog = self.gen_neuron_verilog(index, module_name) # Generate the contents of the neuron verilog
+            neuron_verilog = self.gen_neuron_verilog(index, module_name, freq_thresh=freq_thresh) # Generate the contents of the neuron verilog
             with open(f"{directory}/{module_name}.v", "w") as f:
                 f.write(neuron_verilog)
             connection_string = generate_neuron_connection_verilog(indices, input_bitwidth) # Generate the string which connects the synapses to this neuron
@@ -168,7 +174,7 @@ class SparseLinearNeq(nn.Module):
 
     # TODO: Move the verilog string templates to elsewhere
     # TODO: Move this to another class
-    def gen_neuron_verilog(self, index, module_name):
+    def gen_neuron_verilog(self, index, module_name, freq_thresh=None):
         indices, input_perm_matrix, float_output_states, bin_output_states = self.neuron_truth_tables[index]
         _, input_bitwidth = self.input_quant.get_scale_factor_bits()
         _, output_bitwidth = self.output_quant.get_scale_factor_bits()
@@ -181,7 +187,8 @@ class SparseLinearNeq(nn.Module):
                 val = input_perm_matrix[i,idx]
                 entry_str += self.input_quant.get_bin_str(val)
             res_str = self.output_quant.get_bin_str(bin_output_states[i])
-            lut_string += f"\t\t\t{int(cat_input_bitwidth)}'b{entry_str}: M1r = {int(output_bitwidth)}'b{res_str};\n"
+            if (freq_thresh is None) or (self.used_luts_histogram[index][i] >= freq_thresh):
+                lut_string += f"\t\t\t{int(cat_input_bitwidth)}'b{entry_str}: M1r = {int(output_bitwidth)}'b{res_str};\n"
         return generate_lut_verilog(module_name, int(cat_input_bitwidth), int(output_bitwidth), lut_string)
 
     def lut_inference(self, track_used_luts=False):
