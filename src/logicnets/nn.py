@@ -189,6 +189,9 @@ class SparseLinearNeq(nn.Module):
             res_str = self.output_quant.get_bin_str(bin_output_states[i])
             if (freq_thresh is None) or (self.used_luts_histogram[index][i] >= freq_thresh):
                 lut_string += f"\t\t\t{int(cat_input_bitwidth)}'b{entry_str}: M1r = {int(output_bitwidth)}'b{res_str};\n"
+        # Add a default "don't care" statement
+        default_string = int(output_bitwidth) * 'x'
+        lut_string += f"\t\t\tdefault: M1r = {int(output_bitwidth)}'b{default_string};\n"
         return generate_lut_verilog(module_name, int(cat_input_bitwidth), int(output_bitwidth), lut_string)
 
     def lut_inference(self, track_used_luts=False):

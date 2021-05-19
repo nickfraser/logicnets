@@ -69,7 +69,7 @@ class JetSubstructureNeqModel(nn.Module):
     def verilog_inference(self, verilog_dir, top_module_filename, verify=True):
         self.verilog_dir = realpath(verilog_dir)
         self.top_module_filename = top_module_filename
-        self.dut = PyVerilator.build(f"{self.verilog_dir}/{self.top_module_filename}", verilog_path=[self.verilog_dir], build_dir=f"{self.verilog_dir}/verilator")
+        self.dut = PyVerilator.build(f"{self.verilog_dir}/{self.top_module_filename}", verilog_path=[self.verilog_dir], build_dir=f"{self.verilog_dir}/verilator", command_args=("--x-assign","0",))
         self.is_verilog_inference = True
         self.verify = verify
 
