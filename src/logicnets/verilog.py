@@ -69,7 +69,6 @@ module {module_name} ( input [{input_fanin_bits_1:d}:0] M0, output [{output_bits
 
 	(*rom_style = "distributed" *) reg [{output_bits_1:d}:0] M1r;
 	assign M1 = M1r;
-    (* parallel_case *)
 	always @ (M0) begin
 		case (M0)
 {lut_string}
