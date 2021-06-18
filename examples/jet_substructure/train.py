@@ -44,6 +44,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 2,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "jsc-m": {
         "hidden_layers": [64, 32, 32, 32],
@@ -59,6 +61,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 3,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "jsc-l": {
         "hidden_layers": [32, 64, 192, 192, 16],
@@ -74,6 +78,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 16,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
 }
 
@@ -107,6 +113,7 @@ other_options = {
     "checkpoint": None,
     "generate_bench": None,
     "freq_thresh": None,
+    "histograms": None,
 }
 
 def train(model, datasets, train_cfg, options):

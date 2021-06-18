@@ -62,7 +62,7 @@ if __name__ == "__main__":
         help="The checkpoint file which contains the model weights")
     parser.add_argument('--histograms', type=str, default=None,
         help="The checkpoint histograms of LUT usage (default: %(default)s)")
-    parser.add_argument('--freq-thresh', type=int, default=0,
+    parser.add_argument('--freq-thresh', type=int, default=None,
         help="Threshold to use to include this truth table into the model (default: %(default)s)")
     parser.add_argument('--generate-bench', action='store_true', default=False,
         help="Generate the truth table in BENCH format as well as verilog (default: %(default)s)")
@@ -131,8 +131,9 @@ if __name__ == "__main__":
                     'test_accuracy': lut_accuracy}
 
     torch.save(modelSave, options_cfg["log_dir"] + "/lut_based_model.pth")
-    luts = torch.load(args.histograms)
-    load_histograms(lut_model, luts)
+    if options_cfg["histograms"] is not None:
+        luts = torch.load(options_cfg["histograms"])
+        load_histograms(lut_model, luts)
 
     print("Generating verilog in %s..." % (options_cfg["log_dir"]))
     module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], freq_thresh=options_cfg["freq_thresh"], generate_bench=options_cfg["generate_bench"])
