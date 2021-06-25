@@ -111,9 +111,6 @@ other_options = {
     "cuda": None,
     "log_dir": None,
     "checkpoint": None,
-    "generate_bench": None,
-    "freq_thresh": None,
-    "histograms": None,
 }
 
 def train(model, datasets, train_cfg, options):

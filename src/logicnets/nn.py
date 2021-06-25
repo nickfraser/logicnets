@@ -90,7 +90,7 @@ def neq_inference(model: nn.Module) -> None:
 
 # TODO: Should this go in with the other verilog functions?
 # TODO: Support non-linear topologies
-def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, output_directory: str, freq_thresh = None, generate_bench: bool = True):
+def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, output_directory: str, add_registers: bool = True, generate_bench: bool = True, freq_thresh = None):
     input_bitwidth = None
     output_bitwidth = None
     module_contents = ""
@@ -108,7 +108,8 @@ def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, 
                                                         input_bits=module_input_bits,
                                                         output_string=f"M{i+1}",
                                                         output_bits=module_output_bits,
-                                                        output_wire=i!=len(module_list)-1)
+                                                        output_wire=i!=len(module_list)-1,
+                                                        register=add_registers)
         else:
             raise Exception(f"Expect type(module) == SparseLinearNeq, {type(module)} found")
     module_list_verilog = generate_logicnets_verilog(   module_name=module_name,
@@ -322,6 +323,20 @@ class SparseLinearNeq(nn.Module):
                 # Append the connectivity, input permutations and output permutations to the neuron truth tables 
                 neuron_truth_tables.append((indices, bin_input_permutation_matrix, output_states, bin_output_states)) # Change this to be the binary output states
         self.neuron_truth_tables = neuron_truth_tables
+
+class DenseMask2D(nn.Module):
+    def __init__(self, in_features: int, out_features: int) -> None:
+        super(DenseMask2D, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.mask = Parameter(torch.Tensor(out_features, in_features), requires_grad=False)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        init.constant_(self.mask, 1.0)
+
+    def forward(self):
+        return self.mask
 
 class RandomFixedSparsityMask2D(nn.Module):
     def __init__(self, in_features: int, out_features: int, fan_in: int) -> None:

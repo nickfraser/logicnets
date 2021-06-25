@@ -23,10 +23,20 @@ from logicnets.nn import    generate_truth_tables, \
                             module_list_to_verilog_module, \
                             load_histograms
 
-from train import configs, model_config, dataset_config, other_options, test
+from train import configs, model_config, dataset_config, test
 from dataset import JetSubstructureDataset
 from models import JetSubstructureNeqModel, JetSubstructureLutModel
 from logicnets.synthesis import synthesize_and_get_resource_counts
+
+other_options = {
+    "cuda": None,
+    "log_dir": None,
+    "checkpoint": None,
+    "generate_bench": False,
+    "add_registers": False,
+    "histograms": None,
+    "freq_thresh": None,
+}
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Synthesize convert a PyTorch trained model into verilog")
@@ -68,6 +78,8 @@ if __name__ == "__main__":
         help="Generate the truth table in BENCH format as well as verilog (default: %(default)s)")
     parser.add_argument('--dump-io', action='store_true', default=False,
         help="Dump I/O to the verilog LUT to a text file in the log directory (default: %(default)s)")
+    parser.add_argument('--add-registers', action='store_true', default=False,
+        help="Add registers between each layer in generated verilog (default: %(default)s)")
     args = parser.parse_args()
     defaults = configs[args.arch]
     options = vars(args)
@@ -136,7 +148,7 @@ if __name__ == "__main__":
         load_histograms(lut_model, luts)
 
     print("Generating verilog in %s..." % (options_cfg["log_dir"]))
-    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], freq_thresh=options_cfg["freq_thresh"], generate_bench=options_cfg["generate_bench"])
+    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], generate_bench=options_cfg["generate_bench"], add_registers=options_cfg["add_registers"], freq_thresh=options_cfg["freq_thresh"])
     print("Top level entity stored at: %s/logicnet.v ..." % (options_cfg["log_dir"]))
 
     print("Running inference simulation of Verilog-based model...")
@@ -147,7 +159,7 @@ if __name__ == "__main__":
         print(f"Dumping verilog I/O to {io_filename}...")
     else:
         io_filename = None
-    lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v", logfile=io_filename, verify=options_cfg["freq_thresh"] is None or options_cfg["freq_thresh"] == 0)
+    lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v", logfile=io_filename, add_registers=options_cfg["add_registers"], verify=options_cfg["freq_thresh"] is None or options_cfg["freq_thresh"] == 0)
     verilog_accuracy = test(lut_model, test_loader, cuda=False)
     print("Verilog-Based Model accuracy: %f" % (verilog_accuracy))
 
