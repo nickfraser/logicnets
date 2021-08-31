@@ -29,7 +29,7 @@ from models import JetSubstructureNeqModel, JetSubstructureLutModel
 from logicnets.synthesis import synthesize_and_get_resource_counts
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Synthesize convert a PyTorch trained model into verilog")
+    parser = ArgumentParser(description="Generate histograms of states used throughout LogicNets")
     parser.add_argument('--arch', type=str, choices=configs.keys(), default="jsc-s",
         help="Specific the neural network model to use (default: %(default)s)")
     parser.add_argument('--batch-size', type=int, default=None, metavar='N',
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset-config', type=str, default='config/yaml_IP_OP_config.yml',
         help="The file to use to configure the input dataset (default: %(default)s)")
     parser.add_argument('--log-dir', type=str, default='./log',
-        help="A location to store the log output of the training run and the output model (default: %(default)s)")
+        help="A location to store the calculated histograms (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, required=True,
         help="The checkpoint file which contains the model weights")
     args = parser.parse_args()
