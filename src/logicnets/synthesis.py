@@ -14,10 +14,15 @@
 
 import os
 import subprocess
+import shutil
 from shutil import which
+import glob
+
+from .abc import generate_prepare_script_string, generate_opt_script_string
 
 #xcvu9p-flgb2104-2-i
 # TODO: Add option to perform synthesis on a remote server
+# Synthesise design with vivado and get resource counts
 def synthesize_and_get_resource_counts(verilog_dir, top_name,
 fpga_part = "xcku3p-ffva676-1-e", clk_name="clk", clk_period_ns=5.0):
     # old part : "xczu3eg-sbva484-1-i"
@@ -56,3 +61,43 @@ fpga_part = "xcku3p-ffva676-1-e", clk_name="clk", clk_period_ns=5.0):
     else:
         ret["fmax_mhz"] = 1000.0 / (clk_period_ns - ret["WNS"])
     return ret
+
+# Optimize the design with ABC
+def synthesize_and_get_resource_counts_with_abc(verilog_dir, model, pipeline_stages=0, freq_thresh=0):
+    if "ABC_ROOT" not in os.environ:
+        raise Exception("The environment variable ABC_ROOT is not defined.")
+    abc_path = os.environ["ABC_ROOT"]
+
+    # Create directories and symlinks ready for processing with ABC
+    project_prefix = "logicnet"
+    abc_project_root = f"{verilog_dir}/{project_prefix}"
+    os.makedirs(f"{abc_project_root}/ver")
+    os.makedirs(f"{abc_project_root}/aig")
+    os.makedirs(f"{abc_project_root}/blif")
+    real_abc_project_root = os.path.realpath(abc_project_root)
+    project_symlink_path = f"{abc_path}/{project_prefix}"
+    os.symlink(real_abc_project_root, project_symlink_path) # Create a symlink to this folder in the ABC root.
+    # Fetch the right source files from the verilog directory
+    source_files = glob.glob(f"{verilog_dir}/*.v") + glob.glob(f"{verilog_dir}/*.bench")
+    for f in source_files:
+        shutil.copy(f, f"{abc_project_root}/ver")
+    # Fetch the I/O files
+    for f in glob.glob(f"{verilog_dir}/*.txt"):
+        shutil.copy(f, f"{abc_project_root}")
+
+    # Create script files to pass to ABC
+    # TODO: Calculate number of layers from the model
+    with open(f"{abc_project_root}/prepare.script", "w") as f:
+        f.write(generate_prepare_script_string(num_layers=5, path=project_prefix))
+    with open(f"{abc_project_root}/opt_all.script", "w") as f:
+        f.write(generate_opt_script_string(model=model, path=project_prefix, num_registers=pipeline_stages, rarity=freq_thresh))
+
+    #proc = subprocess.Popen(['./abc', '-c', '"x/jsc_s/prepare.script"', '-c', '"x/jsc_s/opt_all.script"'], cwd=abc_path, stdout=subprocess.PIPE, env=os.environ)
+    proc = subprocess.Popen(['./abc', '-c', f'"{project_prefix}/prepare.script"', '-c', f'"{project_prefix}/opt_all.script"'], cwd=abc_path, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+
+    with open(f"{abc_project_root}/abc.log", "w") as f:
+        f.write(out.decode("utf-8"))
+
+    os.remove(project_symlink_path)
+
