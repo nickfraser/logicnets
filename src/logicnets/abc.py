@@ -56,7 +56,7 @@ def generate_prepare_script_string(num_layers, path):
                                             gen_monolithic_aig_string=gen_monolithic_aig_string)
 
 
-def generate_opt_script_string(model, path, num_registers, rarity=0):
+def generate_opt_script_string(module_list, path, num_registers, rarity=0):
     opt_script_template = """\
 # Generating script with rarity = {rarity}.
 
@@ -82,14 +82,22 @@ read {path}/blif/layers_opt.blif; ps; pipe -L {num_registers}; ps; retime -M 4; 
     technology_map_layer_template = "&r {path}/aig/layer{i}_opt.aig; &lnetmap -I {fanin_bits} -O {fanout_bits}; write {path}/blif/layer{i}_opt.blif; write_verilog -fm {path}/ver/layer{i}_opt.v\n"
     gen_monolithic_aig_template = "putontop {aig_layers_string}; st; ps; write {path}/aig/layers_opt.aig\n"
     gen_monolithic_blif_template = "putontop {blif_layers_string}; sw; ps; write {path}/blif/layers_opt.blif\n"
-    num_layers = 5 # TODO: fetch number of layers from the model
+    num_layers = len(module_list) # TODO: fetch number of layers from the model
     optimise_with_rarity_string = ""
     technology_map_layers_string = ""
     aig_layers_string = ""
     blif_layers_string = ""
     for i in range(num_layers):
-        fanin_bits = 6 # TODO: Read this from model
-        fanout_bits = 2 # TODO: Read this from model
+        # Read in fanin/fanout bits
+        # Add assertion that fanin/fanout bits for all neuron is that same
+        layer = module_list[i]
+        _, input_bitwidth = layer.input_quant.get_scale_factor_bits()
+        _, output_bitwidth = layer.output_quant.get_scale_factor_bits()
+        num_indices = len(layer.neuron_truth_tables[0])
+        fanin_bits = input_bitwidth*num_indices
+        fanout_bits = output_bitwidth
+
+        # Generate optimisation script.
         optimise_with_rarity_string += optimise_with_rarity_template.format(fanin_bits=fanin_bits, fanout_bits=fanout_bits, it="" if i == 0 else i, i=i, path=path, rarity=rarity)
         technology_map_layers_string += technology_map_layer_template.format(fanin_bits=fanin_bits, fanout_bits=fanout_bits, i=i, path=path)
         aig_layers_string += "{path}/aig/layer{i}_opt.aig ".format(i=i, path=path)
