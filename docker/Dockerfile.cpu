@@ -37,6 +37,13 @@ RUN apt-get -qq update && apt-get -qq -y install verilator build-essential libx1
 RUN git clone https://bitbucket.org/maltanar/oh-my-xilinx.git
 ENV OHMYXILINX=/workspace/oh-my-xilinx
 
+# Adding LogicNets dependency on ABC
+RUN git clone https://github.com/berkeley-abc/abc.git \
+    && cd abc \
+    && git checkout ecda331a2a921bcac30bf3210f56adf9152ca22f \
+    && make -j`nproc`
+ENV ABC_ROOT=/workspace/ABC
+
 # Create the user account to run LogicNets
 RUN groupadd -g $GID $GNAME
 RUN useradd -m -u $UID $UNAME -g $GNAME
