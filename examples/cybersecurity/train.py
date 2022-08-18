@@ -44,6 +44,8 @@ configs = {
         "learning_rate": 1e-1,
         "seed": 25,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "nid-s-comp": {
         "hidden_layers": [49, 7],
@@ -59,6 +61,8 @@ configs = {
         "learning_rate": 1e-1,
         "seed": 81,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "nid-m": {
         "hidden_layers": [593, 256, 128, 128],
@@ -74,6 +78,8 @@ configs = {
         "learning_rate": 1e-1,
         "seed": 20,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "nid-m-comp": {
         "hidden_layers": [593, 256, 49, 7],
@@ -89,6 +95,8 @@ configs = {
         "learning_rate": 1e-1,
         "seed": 40,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "nid-l": {
         "hidden_layers": [593, 100, 100, 100],
@@ -104,6 +112,8 @@ configs = {
         "learning_rate": 1e-1,
         "seed": 2,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "nid-l-comp": {
         "hidden_layers": [593, 100, 25, 5],
@@ -119,6 +129,8 @@ configs = {
         "learning_rate": 1e-1,
         "seed": 83,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
 }
 
