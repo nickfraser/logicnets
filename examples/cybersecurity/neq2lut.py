@@ -20,14 +20,13 @@ from torch.utils.data import DataLoader
 
 from logicnets.nn import    generate_truth_tables, \
                             lut_inference, \
-                            module_list_to_verilog_module, \
-                            load_histograms
-
-from train import configs, model_config, dataset_config, test
-from dataset import JetSubstructureDataset
-from models import JetSubstructureNeqModel, JetSubstructureLutModel
+                            module_list_to_verilog_module
 from logicnets.synthesis import synthesize_and_get_resource_counts
 from logicnets.util import proc_postsynth_file
+
+from train import configs, model_config, dataset_config, test
+from dataset import get_preqnt_dataset
+from models import UnswNb15NeqModel, UnswNb15LutModel
 
 other_options = {
     "cuda": None,
@@ -35,15 +34,13 @@ other_options = {
     "checkpoint": None,
     "generate_bench": False,
     "add_registers": False,
-    "histograms": None,
-    "freq_thresh": None,
     "simulate_pre_synthesis_verilog": False,
     "simulate_post_synthesis_verilog": False,
 }
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Synthesize convert a PyTorch trained model into verilog")
-    parser.add_argument('--arch', type=str, choices=configs.keys(), default="jsc-s",
+    parser.add_argument('--arch', type=str, choices=configs.keys(), default="nid-s",
         help="Specific the neural network model to use (default: %(default)s)")
     parser.add_argument('--batch-size', type=int, default=None, metavar='N',
         help="Batch size for evaluation (default: %(default)s)")
@@ -61,22 +58,16 @@ if __name__ == "__main__":
         help="Fanin to use at the output (default: %(default)s)")
     parser.add_argument('--hidden-layers', nargs='+', type=int, default=None,
         help="A list of hidden layer neuron sizes (default: %(default)s)")
-    parser.add_argument('--dataset-file', type=str, default='data/processed-pythia82-lhc13-all-pt1-50k-r1_h022_e0175_t220_nonu_truth.z',
-        help="The file to use as the dataset input (default: %(default)s)")
     parser.add_argument('--clock-period', type=float, default=1.0,
         help="Target clock frequency to use during Vivado synthesis (default: %(default)s)")
-    parser.add_argument('--dataset-config', type=str, default='config/yaml_IP_OP_config.yml',
-        help="The file to use to configure the input dataset (default: %(default)s)")
     parser.add_argument('--dataset-split', type=str, default='test', choices=['train', 'test'],
         help="Dataset to use for evaluation (default: %(default)s)")
+    parser.add_argument('--dataset-file', type=str, default='data/unsw_nb15_binarized.npz',
+        help="The file to use as the dataset input (default: %(default)s)")
     parser.add_argument('--log-dir', type=str, default='./log',
         help="A location to store the log output of the training run and the output model (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, required=True,
         help="The checkpoint file which contains the model weights")
-    parser.add_argument('--histograms', type=str, default=None,
-        help="The checkpoint histograms of LUT usage (default: %(default)s)")
-    parser.add_argument('--freq-thresh', type=int, default=None,
-        help="Threshold to use to include this truth table into the model (default: %(default)s)")
     parser.add_argument('--generate-bench', action='store_true', default=False,
         help="Generate the truth table in BENCH format as well as verilog (default: %(default)s)")
     parser.add_argument('--dump-io', action='store_true', default=False,
@@ -113,14 +104,14 @@ if __name__ == "__main__":
 
     # Fetch the test set
     dataset = {}
-    dataset[args.dataset_split] = JetSubstructureDataset(dataset_cfg['dataset_file'], dataset_cfg['dataset_config'], split=args.dataset_split)
+    dataset[args.dataset_split] = get_preqnt_dataset(dataset_cfg['dataset_file'], split=args.dataset_split)
     test_loader = DataLoader(dataset[args.dataset_split], batch_size=config['batch_size'], shuffle=False)
 
     # Instantiate the PyTorch model
     x, y = dataset[args.dataset_split][0]
     model_cfg['input_length'] = len(x)
-    model_cfg['output_length'] = len(y)
-    model = JetSubstructureNeqModel(model_cfg)
+    model_cfg['output_length'] = 1
+    model = UnswNb15NeqModel(model_cfg)
 
     # Load the model weights
     checkpoint = torch.load(options_cfg['checkpoint'], map_location='cpu')
@@ -133,7 +124,7 @@ if __name__ == "__main__":
     print("Baseline accuracy: %f" % (baseline_accuracy))
 
     # Instantiate LUT-based model
-    lut_model = JetSubstructureLutModel(model_cfg)
+    lut_model = UnswNb15LutModel(model_cfg)
     lut_model.load_state_dict(checkpoint['model_dict'])
 
     # Generate the truth tables in the LUT module
@@ -150,12 +141,9 @@ if __name__ == "__main__":
                     'test_accuracy': lut_accuracy}
 
     torch.save(modelSave, options_cfg["log_dir"] + "/lut_based_model.pth")
-    if options_cfg["histograms"] is not None:
-        luts = torch.load(options_cfg["histograms"])
-        load_histograms(lut_model, luts)
 
     print("Generating verilog in %s..." % (options_cfg["log_dir"]))
-    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], generate_bench=options_cfg["generate_bench"], add_registers=options_cfg["add_registers"], freq_thresh=options_cfg["freq_thresh"])
+    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], generate_bench=options_cfg["generate_bench"], add_registers=options_cfg["add_registers"])
     print("Top level entity stored at: %s/logicnet.v ..." % (options_cfg["log_dir"]))
 
     if args.dump_io:
@@ -168,7 +156,7 @@ if __name__ == "__main__":
 
     if args.simulate_pre_synthesis_verilog:
         print("Running inference simulation of Verilog-based model...")
-        lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v", logfile=io_filename, add_registers=options_cfg["add_registers"], verify=options_cfg["freq_thresh"] is None or options_cfg["freq_thresh"] == 0)
+        lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v", logfile=io_filename, add_registers=options_cfg["add_registers"])
         verilog_accuracy = test(lut_model, test_loader, cuda=False)
         print("Verilog-Based Model accuracy: %f" % (verilog_accuracy))
 
@@ -178,7 +166,7 @@ if __name__ == "__main__":
     if args.simulate_post_synthesis_verilog:
         print("Running post-synthesis inference simulation of Verilog-based model...")
         proc_postsynth_file(options_cfg["log_dir"])
-        lut_model.verilog_inference(options_cfg["log_dir"]+"/post_synth", "logicnet_post_synth.v", io_filename, add_registers=options_cfg["add_registers"], verify=options_cfg["freq_thresh"] is None or options_cfg["freq_thresh"] == 0)
+        lut_model.verilog_inference(options_cfg["log_dir"]+"/post_synth", "logicnet_post_synth.v", io_filename, add_registers=options_cfg["add_registers"])
         post_synth_accuracy = test(lut_model, test_loader, cuda=False)
         print("Post-synthesis Verilog-Based Model accuracy: %f" % (post_synth_accuracy))
     
