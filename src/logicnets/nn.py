@@ -101,7 +101,7 @@ def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, 
             module_input_bits, module_output_bits = m.gen_layer_verilog(module_prefix, output_directory, freq_thresh=freq_thresh, generate_bench=generate_bench)
             if i == 0:
                 input_bitwidth = module_input_bits
-            elif i == len(module_list)-1:
+            if i == len(module_list)-1:
                 output_bitwidth = module_output_bits
             module_contents += layer_connection_verilog( module_prefix,
                                                         input_string=f"M{i}",
