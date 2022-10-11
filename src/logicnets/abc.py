@@ -56,7 +56,7 @@ def generate_prepare_script_string(num_layers, path):
                                             gen_monolithic_aig_string=gen_monolithic_aig_string)
 
 
-def generate_opt_script_string(module_list, path, num_registers, rarity=0):
+def generate_opt_script_string(module_list, path, num_registers, rarity=0, opt_cmd="&lnetopt"):
     opt_script_template = """\
 # Generating script with rarity = {rarity}.
 
@@ -78,7 +78,7 @@ read {path}/blif/layers_opt.blif; ps; pipe -L {num_registers}; ps; retime -M 4; 
 &r {path}/aig/layers_opt.aig; &lneteval -O 2 {path}/test.simo {path}/test_output.txt
 
 """
-    optimise_with_rarity_template = "&r {path}/layer{i}.aig; &ps; &lnetopt -I {fanin_bits} -O {fanout_bits} -R {rarity} {path}/train{it}.sim;  &w {path}/aig/layer{i}_opt.aig; &ps; time\n"
+    optimise_with_rarity_template = "&r {path}/layer{i}.aig; &ps; {opt_cmd} -I {fanin_bits} -O {fanout_bits} -R {rarity} {path}/train{it}.sim;  &w {path}/aig/layer{i}_opt.aig; &ps; time\n"
     technology_map_layer_template = "&r {path}/aig/layer{i}_opt.aig; &lnetmap -I {fanin_bits} -O {fanout_bits}; write {path}/blif/layer{i}_opt.blif; write_verilog -fm {path}/ver/layer{i}_opt.v\n"
     gen_monolithic_aig_template = "putontop {aig_layers_string}; st; ps; write {path}/aig/layers_opt.aig\n"
     gen_monolithic_blif_template = "putontop {blif_layers_string}; sw; ps; write {path}/blif/layers_opt.blif\n"
@@ -98,7 +98,7 @@ read {path}/blif/layers_opt.blif; ps; pipe -L {num_registers}; ps; retime -M 4; 
         fanout_bits = output_bitwidth
 
         # Generate optimisation script.
-        optimise_with_rarity_string += optimise_with_rarity_template.format(fanin_bits=fanin_bits, fanout_bits=fanout_bits, it="" if i == 0 else i, i=i, path=path, rarity=rarity)
+        optimise_with_rarity_string += optimise_with_rarity_template.format(fanin_bits=fanin_bits, fanout_bits=fanout_bits, it="" if i == 0 else i, i=i, path=path, rarity=rarity, opt_cmd=opt_cmd)
         technology_map_layers_string += technology_map_layer_template.format(fanin_bits=fanin_bits, fanout_bits=fanout_bits, i=i, path=path)
         aig_layers_string += "{path}/aig/layer{i}_opt.aig ".format(i=i, path=path)
         blif_layers_string += "{path}/blif/layer{i}_opt.blif ".format(i=i, path=path)
