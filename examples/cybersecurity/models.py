@@ -30,9 +30,9 @@ from logicnets.quant import QuantBrevitasActivation
 from logicnets.nn import SparseLinearNeq, ScalarBiasScale, RandomFixedSparsityMask2D
 from logicnets.init import random_restrict_fanin
 
-class JetSubstructureNeqModel(nn.Module):
+class UnswNb15NeqModel(nn.Module):
     def __init__(self, model_config):
-        super(JetSubstructureNeqModel, self).__init__()
+        super(UnswNb15NeqModel, self).__init__()
         self.model_config = model_config
         self.num_neurons = [model_config["input_length"]] + model_config["hidden_layers"] + [model_config["output_length"]]
         layer_list = []
@@ -41,9 +41,7 @@ class JetSubstructureNeqModel(nn.Module):
             out_features = self.num_neurons[i]
             bn = nn.BatchNorm1d(out_features)
             if i == 1:
-                bn_in = nn.BatchNorm1d(in_features)
-                input_bias = ScalarBiasScale(scale=False, bias_init=-0.25)
-                input_quant = QuantBrevitasActivation(QuantHardTanh(model_config["input_bitwidth"], max_val=1., narrow_range=False, quant_type=QuantType.INT, scaling_impl_type=ScalingImplType.PARAMETER), pre_transforms=[bn_in, input_bias])
+                input_quant = QuantBrevitasActivation(QuantReLU(bit_width=model_config["input_bitwidth"], max_val=1., quant_type=QuantType.INT, scaling_impl_type=ScalingImplType.CONST))
                 output_quant = QuantBrevitasActivation(QuantReLU(bit_width=model_config["hidden_bitwidth"], max_val=1.61, quant_type=QuantType.INT, scaling_impl_type=ScalingImplType.PARAMETER), pre_transforms=[bn])
                 mask = RandomFixedSparsityMask2D(in_features, out_features, fan_in=model_config["input_fanin"])
                 layer = SparseLinearNeq(in_features, out_features, input_quant=input_quant, output_quant=output_quant, sparse_linear_kws={'mask': mask})
@@ -131,13 +129,20 @@ class JetSubstructureNeqModel(nn.Module):
 
     def forward(self, x):
         if self.is_verilog_inference:
-            return self.verilog_forward(x)
+            x = self.verilog_forward(x)
+            output_scale, output_bits = self.module_list[-1].output_quant.get_scale_factor_bits()
+            x = self.module_list[-1].output_quant.apply_post_transforms((x - 2**(output_bits-1)) * output_scale)
         else:
-            return self.pytorch_forward(x)
+            x = self.pytorch_forward(x)
+        # Scale output, if necessary
+            if self.module_list[-1].is_lut_inference:
+                output_scale, output_bits = self.module_list[-1].output_quant.get_scale_factor_bits()
+                x = self.module_list[-1].output_quant.apply_post_transforms(x * output_scale)
+        return x
 
-class JetSubstructureLutModel(JetSubstructureNeqModel):
+class UnswNb15LutModel(UnswNb15NeqModel):
     pass
 
-class JetSubstructureVerilogModel(JetSubstructureNeqModel):
+class UnswNb15VerilogModel(UnswNb15NeqModel):
     pass
 

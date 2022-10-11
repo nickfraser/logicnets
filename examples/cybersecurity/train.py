@@ -25,58 +25,109 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from dataset import JetSubstructureDataset
-from models import JetSubstructureNeqModel
+from dataset import get_preqnt_dataset
+from models import UnswNb15NeqModel
 
 # TODO: Replace default configs with YAML files.
 configs = {
-    "jsc-s": {
-        "hidden_layers": [64, 32, 32, 32],
-        "input_bitwidth": 2,
+    "nid-s": {
+        "hidden_layers": [593, 100],
+        "input_bitwidth": 1,
         "hidden_bitwidth": 2,
         "output_bitwidth": 2,
-        "input_fanin": 3,
-        "hidden_fanin": 3,
-        "output_fanin": 3,
-        "weight_decay": 1e-3,
+        "input_fanin": 7,
+        "hidden_fanin": 7,
+        "output_fanin": 7,
+        "weight_decay": 0.0,
         "batch_size": 1024,
-        "epochs": 1000,
-        "learning_rate": 1e-3,
+        "epochs": 100,
+        "learning_rate": 1e-1,
+        "seed": 25,
+        "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
+    },
+    "nid-s-comp": {
+        "hidden_layers": [49, 7],
+        "input_bitwidth": 1,
+        "hidden_bitwidth": 2,
+        "output_bitwidth": 2,
+        "input_fanin": 7,
+        "hidden_fanin": 7,
+        "output_fanin": 7,
+        "weight_decay": 0.0,
+        "batch_size": 1024,
+        "epochs": 100,
+        "learning_rate": 1e-1,
+        "seed": 81,
+        "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
+    },
+    "nid-m": {
+        "hidden_layers": [593, 256, 128, 128],
+        "input_bitwidth": 1,
+        "hidden_bitwidth": 2,
+        "output_bitwidth": 2,
+        "input_fanin": 7,
+        "hidden_fanin": 7,
+        "output_fanin": 7,
+        "weight_decay": 0.0,
+        "batch_size": 1024,
+        "epochs": 100,
+        "learning_rate": 1e-1,
+        "seed": 20,
+        "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
+    },
+    "nid-m-comp": {
+        "hidden_layers": [593, 256, 49, 7],
+        "input_bitwidth": 1,
+        "hidden_bitwidth": 2,
+        "output_bitwidth": 2,
+        "input_fanin": 7,
+        "hidden_fanin": 7,
+        "output_fanin": 7,
+        "weight_decay": 0.0,
+        "batch_size": 1024,
+        "epochs": 100,
+        "learning_rate": 1e-1,
+        "seed": 40,
+        "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
+    },
+    "nid-l": {
+        "hidden_layers": [593, 100, 100, 100],
+        "input_bitwidth": 1,
+        "hidden_bitwidth": 3,
+        "output_bitwidth": 3,
+        "input_fanin": 7,
+        "hidden_fanin": 5,
+        "output_fanin": 5,
+        "weight_decay": 0.0,
+        "batch_size": 1024,
+        "epochs": 100,
+        "learning_rate": 1e-1,
         "seed": 2,
         "checkpoint": None,
         "histograms": None,
         "freq_thresh": None,
     },
-    "jsc-m": {
-        "hidden_layers": [64, 32, 32, 32],
-        "input_bitwidth": 3,
+    "nid-l-comp": {
+        "hidden_layers": [593, 100, 25, 5],
+        "input_bitwidth": 1,
         "hidden_bitwidth": 3,
         "output_bitwidth": 3,
-        "input_fanin": 4,
-        "hidden_fanin": 4,
-        "output_fanin": 4,
-        "weight_decay": 1e-3,
-        "batch_size": 1024,
-        "epochs": 1000,
-        "learning_rate": 1e-3,
-        "seed": 3,
-        "checkpoint": None,
-        "histograms": None,
-        "freq_thresh": None,
-    },
-    "jsc-l": {
-        "hidden_layers": [32, 64, 192, 192, 16],
-        "input_bitwidth": 4,
-        "hidden_bitwidth": 3,
-        "output_bitwidth": 7,
-        "input_fanin": 3,
-        "hidden_fanin": 4,
+        "input_fanin": 7,
+        "hidden_fanin": 5,
         "output_fanin": 5,
-        "weight_decay": 1e-3,
+        "weight_decay": 0.0,
         "batch_size": 1024,
-        "epochs": 1000,
-        "learning_rate": 1e-3,
-        "seed": 16,
+        "epochs": 100,
+        "learning_rate": 1e-1,
+        "seed": 83,
         "checkpoint": None,
         "histograms": None,
         "freq_thresh": None,
@@ -104,7 +155,6 @@ training_config = {
 
 dataset_config = {
     "dataset_file": None,
-    "dataset_config": None,
 }
 
 other_options = {
@@ -143,7 +193,7 @@ def train(model, datasets, train_cfg, options):
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=steps*100, T_mult=1)
 
     # Configure criterion
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
 
     # Push the model to the GPU, if necessary
     if options["cuda"]:
@@ -165,10 +215,9 @@ def train(model, datasets, train_cfg, options):
                 data, target = data.cuda(), target.cuda()
             optimizer.zero_grad()
             output = model(data)
-            loss = criterion(output, torch.max(target, 1)[1])
-            pred = output.detach().max(1, keepdim=True)[1]
-            target_label = torch.max(target.detach(), 1, keepdim=True)[1]
-            curCorrect = pred.eq(target_label).long().sum()
+            loss = criterion(output, target.unsqueeze(1))
+            pred = (torch.sigmoid(output.detach()) > 0.75) * 1
+            curCorrect = pred.eq(target.unsqueeze(1)).long().sum()
             curAcc = 100.0*curCorrect / len(data)
             correct += curCorrect
             accLoss += loss.detach()*len(data)
@@ -205,7 +254,7 @@ def train(model, datasets, train_cfg, options):
         writer.add_scalar('test_accuracy', test_accuracy, (epoch+1)*steps)
         print(f"Epoch: {epoch}/{num_epochs}\tValid Acc (%): {val_accuracy:.2f}\tTest Acc: {test_accuracy:.2f}")
 
-def test(model, dataset_loader, cuda):
+def test(model, dataset_loader, cuda, thresh=0.75):
     model.eval()
     correct = 0
     accLoss = 0.0
@@ -213,17 +262,16 @@ def test(model, dataset_loader, cuda):
         if cuda:
             data, target = data.cuda(), target.cuda()
         output = model(data)
-        pred = output.detach().max(1, keepdim=True)[1]
-        target_label = torch.max(target.detach(), 1, keepdim=True)[1]
-        curCorrect = pred.eq(target_label).long().sum()
+        pred = (torch.sigmoid(output.detach()) > thresh) * 1
+        curCorrect = pred.eq(target.unsqueeze(1)).long().sum()
         curAcc = 100.0*curCorrect / len(data)
         correct += curCorrect
     accuracy = 100*float(correct) / len(dataset_loader.dataset)
     return accuracy
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="LogicNets Jet Substructure Classification Example")
-    parser.add_argument('--arch', type=str, choices=configs.keys(), default="jsc-s",
+    parser = ArgumentParser(description="LogicNets Network Intrusion Detection Example")
+    parser.add_argument('--arch', type=str, choices=configs.keys(), default="nid-s",
         help="Specific the neural network model to use (default: %(default)s)")
     parser.add_argument('--weight-decay', type=float, default=None, metavar='D',
         help="Weight decay (default: %(default)s)")
@@ -253,10 +301,8 @@ if __name__ == "__main__":
         help="A list of hidden layer neuron sizes (default: %(default)s)")
     parser.add_argument('--log-dir', type=str, default='./log',
         help="A location to store the log output of the training run and the output model (default: %(default)s)")
-    parser.add_argument('--dataset-file', type=str, default='data/processed-pythia82-lhc13-all-pt1-50k-r1_h022_e0175_t220_nonu_truth.z',
+    parser.add_argument('--dataset-file', type=str, default='data/unsw_nb15_binarized.npz',
         help="The file to use as the dataset input (default: %(default)s)")
-    parser.add_argument('--dataset-config', type=str, default='config/yaml_IP_OP_config.yml',
-        help="The file to use to configure the input dataset (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, default=None,
         help="Retrain the model from a previous checkpoint (default: %(default)s)")
     args = parser.parse_args()
@@ -295,15 +341,15 @@ if __name__ == "__main__":
 
     # Fetch the datasets
     dataset = {}
-    dataset['train'] = JetSubstructureDataset(dataset_cfg['dataset_file'], dataset_cfg['dataset_config'], split="train")
-    dataset['valid'] = JetSubstructureDataset(dataset_cfg['dataset_file'], dataset_cfg['dataset_config'], split="train") # This dataset is so small, we'll just use the training set as the validation set, otherwise we may have too few trainings examples to converge.
-    dataset['test'] = JetSubstructureDataset(dataset_cfg['dataset_file'], dataset_cfg['dataset_config'], split="test")
+    dataset['train'] = get_preqnt_dataset(dataset_cfg['dataset_file'], split="train")
+    dataset['valid'] = get_preqnt_dataset(dataset_cfg['dataset_file'], split="test") # This dataset is so small, we'll just use the test set as the validation set, otherwise we may have too few trainings examples to converge.
+    dataset['test'] = get_preqnt_dataset(dataset_cfg['dataset_file'], split="test")
 
     # Instantiate model
     x, y = dataset['train'][0]
     model_cfg['input_length'] = len(x)
-    model_cfg['output_length'] = len(y)
-    model = JetSubstructureNeqModel(model_cfg)
+    model_cfg['output_length'] = 1
+    model = UnswNb15NeqModel(model_cfg)
     if options_cfg['checkpoint'] is not None:
         print(f"Loading pre-trained checkpoint {options_cfg['checkpoint']}")
         checkpoint = torch.load(options_cfg['checkpoint'], map_location='cpu')

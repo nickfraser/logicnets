@@ -47,10 +47,40 @@ def generate_truth_tables(model: nn.Module, verbose: bool = False) -> None:
     model.training = training
 
 # TODO: Create a container module which performs this function.
-def lut_inference(model: nn.Module) -> None:
+def lut_inference(model: nn.Module, track_used_luts: bool = False) -> None:
     for name, module in model.named_modules():
         if type(module) == SparseLinearNeq:
-            module.lut_inference()
+            module.lut_inference(track_used_luts=track_used_luts)
+
+# TODO: Create a container module which performs this function.
+def save_luts(model: nn.Module, path: str) -> None:
+    lut_dict = {}
+    for name, module in model.named_modules():
+        if type(module) == SparseLinearNeq:
+            luts = module.neuron_truth_tables
+            indices = list(map(lambda x: x[0], luts))
+            tt_inputs = list(map(lambda x: x[1], luts))
+            tt_input_bin_str = list(map(lambda x: list(map(lambda y: list(map(lambda z: module.input_quant.get_bin_str(z), y)), x)), tt_inputs))
+            tt_float_outputs = list(map(lambda x: x[2], luts))
+            tt_bin_outputs = list(map(lambda x: x[3], luts))
+            tt_outputs_bin_str = list(map(lambda x: list(map(lambda y: module.output_quant.get_bin_str(y), x)), tt_bin_outputs))
+            histogram = module.used_luts_histogram
+            lut_dict[name] = {
+                'indices': indices,
+                'input_state_space': tt_inputs,
+                'input_state_space_bin_str': tt_input_bin_str,
+                'output_state_space_float': tt_float_outputs,
+                'output_state_space_bin': tt_bin_outputs,
+                'output_state_space_bin_str': tt_outputs_bin_str,
+                'histogram': histogram,
+            }
+    torch.save(lut_dict, path)
+
+# TODO: Create a container module which performs this function.
+def load_histograms(model: nn.Module, lut_dict: dict) -> None:
+    for name, module in model.named_modules():
+        if name in lut_dict.keys():
+            module.used_luts_histogram = lut_dict[name]['histogram']
 
 # TODO: Create a container module which performs this function.
 def neq_inference(model: nn.Module) -> None:
@@ -60,7 +90,7 @@ def neq_inference(model: nn.Module) -> None:
 
 # TODO: Should this go in with the other verilog functions?
 # TODO: Support non-linear topologies
-def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, output_directory: str, add_registers: bool = True, generate_bench: bool = True):
+def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, output_directory: str, add_registers: bool = True, generate_bench: bool = True, freq_thresh = None):
     input_bitwidth = None
     output_bitwidth = None
     module_contents = ""
@@ -68,10 +98,10 @@ def module_list_to_verilog_module(module_list: nn.ModuleList, module_name: str, 
         m = module_list[i]
         if type(m) == SparseLinearNeq:
             module_prefix = f"layer{i}"
-            module_input_bits, module_output_bits = m.gen_layer_verilog(module_prefix, output_directory, generate_bench=generate_bench)
+            module_input_bits, module_output_bits = m.gen_layer_verilog(module_prefix, output_directory, freq_thresh=freq_thresh, generate_bench=generate_bench)
             if i == 0:
                 input_bitwidth = module_input_bits
-            elif i == len(module_list)-1:
+            if i == len(module_list)-1:
                 output_bitwidth = module_output_bits
             module_contents += layer_connection_verilog( module_prefix,
                                                         input_string=f"M{i}",
@@ -115,11 +145,13 @@ class SparseLinearNeq(nn.Module):
         self.neuron_truth_tables = None
         self.apply_input_quant = apply_input_quant
         self.apply_output_quant = apply_output_quant
+        self.track_used_luts = False
+        self.used_luts_histogram = None
 
     # TODO: Move the verilog string templates to elsewhere
     # TODO: Move this to another class
     # TODO: Update this code to support custom bitwidths per input/output
-    def gen_layer_verilog(self, module_prefix, directory, generate_bench: bool = True):
+    def gen_layer_verilog(self, module_prefix, directory, freq_thresh = None, generate_bench: bool = True):
         _, input_bitwidth = self.input_quant.get_scale_factor_bits()
         _, output_bitwidth = self.output_quant.get_scale_factor_bits()
         input_bitwidth, output_bitwidth = int(input_bitwidth), int(output_bitwidth)
@@ -130,7 +162,7 @@ class SparseLinearNeq(nn.Module):
         for index in range(self.out_features):
             module_name = f"{module_prefix}_N{index}"
             indices, _, _, _ = self.neuron_truth_tables[index]
-            neuron_verilog = self.gen_neuron_verilog(index, module_name) # Generate the contents of the neuron verilog
+            neuron_verilog = self.gen_neuron_verilog(index, module_name, freq_thresh=freq_thresh) # Generate the contents of the neuron verilog
             with open(f"{directory}/{module_name}.v", "w") as f:
                 f.write(neuron_verilog)
             if generate_bench:
@@ -150,7 +182,7 @@ class SparseLinearNeq(nn.Module):
 
     # TODO: Move the verilog string templates to elsewhere
     # TODO: Move this to another class
-    def gen_neuron_verilog(self, index, module_name):
+    def gen_neuron_verilog(self, index, module_name, freq_thresh=None):
         indices, input_perm_matrix, float_output_states, bin_output_states = self.neuron_truth_tables[index]
         _, input_bitwidth = self.input_quant.get_scale_factor_bits()
         _, output_bitwidth = self.output_quant.get_scale_factor_bits()
@@ -163,7 +195,11 @@ class SparseLinearNeq(nn.Module):
                 val = input_perm_matrix[i,idx]
                 entry_str += self.input_quant.get_bin_str(val)
             res_str = self.output_quant.get_bin_str(bin_output_states[i])
-            lut_string += f"\t\t\t{int(cat_input_bitwidth)}'b{entry_str}: M1r = {int(output_bitwidth)}'b{res_str};\n"
+            if (freq_thresh is None) or (self.used_luts_histogram[index][i] >= freq_thresh):
+                lut_string += f"\t\t\t{int(cat_input_bitwidth)}'b{entry_str}: M1r = {int(output_bitwidth)}'b{res_str};\n"
+        # Add a default "don't care" statement
+        default_string = int(output_bitwidth) * 'x'
+        lut_string += f"\t\t\tdefault: M1r = {int(output_bitwidth)}'b{default_string};\n"
         return generate_lut_verilog(module_name, int(cat_input_bitwidth), int(output_bitwidth), lut_string)
 
     # TODO: Move the string templates to bench.py
@@ -187,8 +223,9 @@ class SparseLinearNeq(nn.Module):
             lut_string += generate_lut_input_string(int(cat_input_bitwidth))
         return generate_lut_bench(int(cat_input_bitwidth), int(output_bitwidth), lut_string)
 
-    def lut_inference(self):
+    def lut_inference(self, track_used_luts=False):
         self.is_lut_inference = True
+        self.track_used_luts = track_used_luts
         self.input_quant.bin_output()
         self.output_quant.bin_output()
 
@@ -198,7 +235,7 @@ class SparseLinearNeq(nn.Module):
         self.output_quant.float_output()
 
     # TODO: This function might be a useful utility outside of this class..
-    def table_lookup(self, connected_input: Tensor, input_perm_matrix: Tensor, bin_output_states: Tensor) -> Tensor:
+    def table_lookup(self, connected_input: Tensor, input_perm_matrix: Tensor, bin_output_states: Tensor, neuron_lut_histogram=None) -> Tensor:
         fan_in_size = connected_input.shape[1]
         ci_bcast = connected_input.unsqueeze(2) # Reshape to B x Fan-in x 1
         pm_bcast = input_perm_matrix.t().unsqueeze(0) # Reshape to 1 x Fan-in x InputStates
@@ -207,17 +244,29 @@ class SparseLinearNeq(nn.Module):
         if not (matches == torch.ones_like(matches,dtype=matches.dtype)).all():
             raise Exception(f"One or more vectors in the input is not in the possible input state space")
         indices = torch.argmax(eq.type(torch.int64),dim=1)
+        if self.track_used_luts:
+            # TODO: vectorize this loop
+            for i in indices:
+                neuron_lut_histogram[i] += 1
         return bin_output_states[indices]
 
     def lut_forward(self, x: Tensor) -> Tensor:
         if self.apply_input_quant:
             x = self.input_quant(x) # Use this to fetch the bin output of the input, if the input isn't already in binary format
+        # TODO: Put this in a child class(?)
+        # TODO: Add support for non-uniform fan-in
+        if self.track_used_luts:
+            if self.used_luts_histogram is None:
+                self.used_luts_histogram = self.out_features * [None]
+                for i in range(self.out_features):
+                    self.used_luts_histogram[i] = torch.zeros(size=(len(self.neuron_truth_tables[i][2]),), dtype=torch.int64)
         y = torch.zeros((x.shape[0],self.out_features))
         # Perform table lookup for each neuron output
         for i in range(self.out_features):
             indices, input_perm_matrix, float_output_states, bin_output_states = self.neuron_truth_tables[i]
+            neuron_lut_histogram = self.used_luts_histogram[i] if self.track_used_luts else None
             connected_input = x[:,indices]
-            y[:,i] = self.table_lookup(connected_input, input_perm_matrix, bin_output_states)
+            y[:,i] = self.table_lookup(connected_input, input_perm_matrix, bin_output_states, neuron_lut_histogram=neuron_lut_histogram)
         return y
 
     def forward(self, x: Tensor) -> Tensor:
