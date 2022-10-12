@@ -15,6 +15,12 @@
 
 import os
 import subprocess
+import re
+
+_aig_re_str = r'and\s+=\s+\d+'
+_acc_re_str = r'The\s+accuracy\s+is\s+\d+\.\d+'
+_avg_cs_re_str = r'Average\s+care\s+set\s+is\s+\d+\.\d+'
+_elapse_s_re_str = r'elapse:\s+\d+\.\d+'
 
 def verilog_bench_to_aig(verilog_file, aig_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
     cmd = [f"{abc_path}/abc", '-c', f"&lnetread {verilog_file}; &ps; &w {aig_file}"]
@@ -22,7 +28,8 @@ def verilog_bench_to_aig(verilog_file, aig_file, abc_path=os.environ["ABC_ROOT"]
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
     out, err = proc.communicate()
-    nodes = 0
+    aig_re = re.compile(_aig_re_str)
+    nodes = int(aig_re.search(str(out)).group().split(" ")[-1])
     if verbose:
         print(nodes)
         print(out)
@@ -57,7 +64,8 @@ def putontop_aig(aig_files, output_aig_file, abc_path=os.environ["ABC_ROOT"], wo
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
     out, err = proc.communicate()
-    nodes = 0
+    aig_re = re.compile(_aig_re_str)
+    nodes = int(aig_re.search(str(out)).group().split(" ")[-1])
     if verbose:
         print(nodes)
         print(out)
@@ -70,7 +78,8 @@ def putontop_blif(blif_files, output_blif_file, abc_path=os.environ["ABC_ROOT"],
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
     out, err = proc.communicate()
-    nodes = 0
+    aig_re = re.compile(_aig_re_str)
+    nodes = int(aig_re.search(str(out)).group().split(" ")[-1])
     if verbose:
         print(nodes)
         print(out)
@@ -83,9 +92,15 @@ def optimize_bdd_network(circuit_file, output_file, input_bitwidth, output_bitwi
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
     out, err = proc.communicate()
-    nodes = 0
-    tt_pct = 100.
-    time_s = 0.0
+    aig_re = re.compile(_aig_re_str)
+    nodes = int(aig_re.search(str(out)).group().split(" ")[-1])
+    if opt_cmd == "&lnetopt":
+        tt_pct_re = re.compile(_avg_cs_re_str)
+        tt_pct = float(tt_pct_re.search(str(out)).group().split(" ")[-1])
+    else:
+        tt_pct = None
+    time_re = re.compile(_elapse_s_re_str)
+    time_s = float(time_re.search(str(out)).group().split(" ")[-1])
     if verbose:
         print(nodes)
         print(tt_pct)
@@ -111,7 +126,8 @@ def evaluate_accuracy(circuit_file, sim_output_file, reference_txt, output_bitwi
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
     out, err = proc.communicate()
-    accuracy = 0.0
+    acc_re = re.compile(_acc_re_str)
+    accuracy = float(acc_re.search(str(out)).group().split(" ")[-1])
     if verbose:
         print(accuracy)
         print(out)

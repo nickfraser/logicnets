@@ -111,12 +111,14 @@ def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeli
         out, err = simulate_circuit(f"aig/layer{i}.aig", f"train{i}.sim" if i != 0 else "train.sim", f"train{i+1}.sim", working_dir=abc_project_root, verbose=verbose)
 
     # Synthesis
+    average_tt_pcts = []
     for i in range(len(module_list)):
         _, input_bitwidth = module_list[i].input_quant.get_scale_factor_bits()
         _, output_bitwidth = module_list[i].output_quant.get_scale_factor_bits()
         indices, _, _, _ = module_list[i].neuron_truth_tables[0]
         fanin = len(indices)
         nodes, tt_pct, time, out, err = optimize_bdd_network(f"aig/layer{i}.aig", f"aig/layer{i}_full.aig", int(input_bitwidth*fanin), int(output_bitwidth), freq_thresh, f"train{i}.sim" if i != 0 else "train.sim", opt_cmd=bdd_opt_cmd, working_dir=abc_project_root, verbose=verbose)
+        average_tt_pcts.append(tt_pct)
 
     # Technology mapping
     for i in range(len(module_list)):
@@ -143,5 +145,5 @@ def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeli
     out, err = simulate_circuit(f"aig/layers_full.aig", "test.sim", "test.simo", working_dir=abc_project_root, verbose=verbose)
     test_accuracy, out, err = evaluate_accuracy(f"aig/layers_full.aig", "test.simo", test_output_txt, int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
 
-    return train_accuracy, test_accuracy, nodes
+    return train_accuracy, test_accuracy, nodes, average_tt_pcts
 
