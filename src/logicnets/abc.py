@@ -13,6 +13,111 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
+import subprocess
+
+def verilog_bench_to_aig(verilog_file, aig_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&lnetread {verilog_file}; &ps; &w {aig_file}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    nodes = 0
+    if verbose:
+        print(nodes)
+        print(out)
+        print(err)
+    return nodes, out, err # TODO: return the number of nodes
+
+def txt_to_sim(txt_file, sim_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&lnetread {txt_file} {sim_file}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    if verbose:
+        print(out)
+        print(err)
+    return out, err
+
+def simulate_circuit(circuit_file, sim_input_file, sim_output_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lnetsim {sim_input_file} {sim_output_file}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    if verbose:
+        print(out)
+        print(err)
+    return out, err
+
+def putontop_aig(aig_files, output_aig_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"putontop {' '.join(aig_files)}; st; ps; write {output_aig_file}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    nodes = 0
+    if verbose:
+        print(nodes)
+        print(out)
+        print(err)
+    return nodes, out, err # TODO: return the number of nodes
+
+def putontop_blif(blif_files, output_blif_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"putontop {' '.join(blif_files)}; sw; ps; write {output_blif_file}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    nodes = 0
+    if verbose:
+        print(nodes)
+        print(out)
+        print(err)
+    return nodes, out, err # TODO: return the number of nodes
+
+def optimize_bdd_network(circuit_file, output_file, input_bitwidth, output_bitwidth, rarity, sim_file, opt_cmd="&lnetopt", abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &ps; {opt_cmd} -I {input_bitwidth} -O {output_bitwidth} -R {rarity} {sim_file}; &w {output_file}; &ps; time"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    nodes = 0
+    tt_pct = 100.
+    time_s = 0.0
+    if verbose:
+        print(nodes)
+        print(tt_pct)
+        print(time_s)
+        print(out)
+        print(err)
+    return nodes, tt_pct, time_s, out, err # TODO: return the number of nodes, tt%, time
+
+def tech_map_circuit(circuit_file, output_blif, output_verilog, input_bitwidth, output_bitwidth, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lnetmap -I {input_bitwidth} -O {output_bitwidth}; write {output_blif}; write_verilog -fm {output_verilog}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    if verbose:
+        print(out)
+        print(err)
+    return out, err
+
+def evaluate_accuracy(circuit_file, sim_output_file, reference_txt, output_bitwidth, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lneteval -O {output_bitwidth} {sim_output_file} {reference_txt}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    accuracy = 0.0
+    if verbose:
+        print(accuracy)
+        print(out)
+        print(err)
+    return accuracy, out, err # TODO: accuracy %, time
+
 def generate_prepare_script_string(num_layers, path):
     prepare_script_template = """\
 # This script prepares experiments in ABC by deriving intermediate simulation patterns

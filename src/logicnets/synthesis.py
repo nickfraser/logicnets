@@ -18,7 +18,14 @@ import shutil
 from shutil import which
 import glob
 
-from .abc import generate_prepare_script_string, generate_opt_script_string
+from .abc import    verilog_bench_to_aig,\
+                    txt_to_sim,\
+                    simulate_circuit,\
+                    putontop_aig,\
+                    putontop_blif,\
+                    optimize_bdd_network,\
+                    evaluate_accuracy,\
+                    tech_map_circuit
 
 #xcvu9p-flgb2104-2-i
 # TODO: Add option to perform synthesis on a remote server
@@ -62,47 +69,79 @@ def synthesize_and_get_resource_counts(verilog_dir, top_name, fpga_part = "xcku3
     return ret
 
 # Optimize the design with ABC
-def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeline_stages=0, freq_thresh=0):
+def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeline_stages=0, freq_thresh=0, train_input_txt="train_input.txt", train_output_txt="train_output.txt", test_input_txt="test_input.txt", test_output_txt="test_output.txt", verbose=False):
     if "ABC_ROOT" not in os.environ:
         raise Exception("The environment variable ABC_ROOT is not defined.")
     abc_path = os.environ["ABC_ROOT"]
 
     # Create directories and symlinks ready for processing with ABC
-    project_prefix = "logicnet"
+    project_prefix = "abc"
     abc_project_root = f"{verilog_dir}/{project_prefix}"
     verilog_bench_dir = f"{abc_project_root}/ver"
     aig_dir = f"{abc_project_root}/aig"
     blif_dir = f"{abc_project_root}/blif"
+    veropt_dir = f"{abc_project_root}/veropt"
     if not os.path.exists(verilog_bench_dir):
         os.makedirs(verilog_bench_dir)
     if not os.path.exists(aig_dir):
         os.makedirs(aig_dir)
     if not os.path.exists(blif_dir):
         os.makedirs(blif_dir)
-    real_abc_project_root = os.path.realpath(abc_project_root)
-    project_symlink_path = f"{abc_path}/{project_prefix}"
-    os.symlink(real_abc_project_root, project_symlink_path) # Create a symlink to this folder in the ABC root.
+    if not os.path.exists(veropt_dir):
+        os.makedirs(veropt_dir)
     # Fetch the right source files from the verilog directory
-    source_files = glob.glob(f"{verilog_dir}/*.v") + glob.glob(f"{verilog_dir}/*.bench")
+    source_files = glob.glob(f"{verilog_dir}/logicnet.v") + [f"{verilog_dir}/layer{i}.v" for i in range(len(module_list))] + glob.glob(f"{verilog_dir}/*.bench")
     for f in source_files:
         shutil.copy(f, verilog_bench_dir)
     # Fetch the I/O files
-    for f in glob.glob(f"{verilog_dir}/*.txt"):
+    for f in list(map(lambda x: f"{verilog_dir}/{x}", [train_input_txt, train_output_txt, test_input_txt, test_output_txt])):
         shutil.copy(f, f"{abc_project_root}")
 
-    # Create script files to pass to ABC
-    # TODO: Calculate number of layers from the model
-    with open(f"{abc_project_root}/prepare.script", "w") as f:
-        f.write(generate_prepare_script_string(num_layers=len(module_list), path=project_prefix))
-    with open(f"{abc_project_root}/opt_all.script", "w") as f:
-        f.write(generate_opt_script_string(module_list=module_list, path=project_prefix, num_registers=pipeline_stages, rarity=freq_thresh))
+    # Preparation - model / I/O conversion
+    # Convert txt inputs into the sim format
+    out, err = txt_to_sim(train_input_txt, "train.sim", working_dir=abc_project_root, verbose=verbose)
+    out, err = txt_to_sim(test_input_txt, "test.sim", working_dir=abc_project_root)
 
-    #proc = subprocess.Popen(['./abc', '-c', '"x/jsc_s/prepare.script"', '-c', '"x/jsc_s/opt_all.script"'], cwd=abc_path, stdout=subprocess.PIPE, env=os.environ)
-    proc = subprocess.Popen(['./abc', '-c', f'"{project_prefix}/prepare.script"', '-c', f'"{project_prefix}/opt_all.script"'], cwd=abc_path, stdout=subprocess.PIPE, env=os.environ)
-    out, err = proc.communicate()
+    # Create AIGs from verilog
+    for i in range(len(module_list)):
+        nodes, out, err = verilog_bench_to_aig(f"ver/layer{i}.v", f"aig/layer{i}.aig", working_dir=abc_project_root, verbose=verbose)
 
-    with open(f"{abc_project_root}/abc.log", "w") as f:
-        f.write(out.decode("utf-8"))
+    # Simulate each layer
+    for i in range(len(module_list)):
+        out, err = simulate_circuit(f"aig/layer{i}.aig", f"train{i}.sim" if i != 0 else "train.sim", f"train{i+1}.sim", working_dir=abc_project_root, verbose=verbose)
 
-    os.remove(project_symlink_path)
+    # Synthesis
+    for i in range(len(module_list)):
+        _, input_bitwidth = module_list[i].input_quant.get_scale_factor_bits()
+        _, output_bitwidth = module_list[i].output_quant.get_scale_factor_bits()
+        indices, _, _, _ = module_list[i].neuron_truth_tables[0]
+        fanin = len(indices)
+        nodes, tt_pct, time, out, err = optimize_bdd_network(f"aig/layer{i}.aig", f"aig/layer{i}_full.aig", int(input_bitwidth*fanin), int(output_bitwidth), freq_thresh, f"train{i}.sim" if i != 0 else "train.sim", opt_cmd="&lnetopt", working_dir=abc_project_root, verbose=verbose)
+
+    # Technology mapping
+    for i in range(len(module_list)):
+        _, input_bitwidth = module_list[i].input_quant.get_scale_factor_bits()
+        _, output_bitwidth = module_list[i].output_quant.get_scale_factor_bits()
+        indices, _, _, _ = module_list[i].neuron_truth_tables[0]
+        fanin = len(indices)
+        out, err = tech_map_circuit(f"aig/layer{i}_full.aig", f"blif/layer{i}_full.blif", f"veropt/layer{i}_full.v", int(input_bitwidth*fanin), int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
+
+    # Generate monolithic circuits
+    if len(module_list) > 1:
+        nodes, out, err = putontop_aig([f"aig/layer{i}_full.aig" for i in range(len(module_list))], f"aig/layers_full.aig", working_dir=abc_project_root, verbose=verbose)
+        nodes, out, err = putontop_blif([f"blif/layer{i}_full.blif" for i in range(len(module_list))], f"blif/layers_full.blif", working_dir=abc_project_root, verbose=verbose)
+    else:
+        shutil.copy(f"{aig_dir}/layer0_full.aig", f"{aig_dir}/layers_full.aig")
+        shutil.copy(f"{blif_dir}/layer0_full.blif", f"{blif_dir}/layers_full.blif")
+
+    # Evaluation
+    # Training set:
+    _, output_bitwidth = module_list[-1].output_quant.get_scale_factor_bits()
+    out, err = simulate_circuit(f"aig/layers_full.aig", "train.sim", "train.simo", working_dir=abc_project_root, verbose=verbose)
+    train_accuracy, out, err = evaluate_accuracy(f"aig/layers_full.aig", "train.simo", train_output_txt, int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
+    # Test set:
+    out, err = simulate_circuit(f"aig/layers_full.aig", "test.sim", "test.simo", working_dir=abc_project_root, verbose=verbose)
+    test_accuracy, out, err = evaluate_accuracy(f"aig/layers_full.aig", "test.simo", test_output_txt, int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
+
+    return train_accuracy, test_accuracy, nodes
 
