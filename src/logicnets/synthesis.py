@@ -69,7 +69,7 @@ def synthesize_and_get_resource_counts(verilog_dir, top_name, fpga_part = "xcku3
     return ret
 
 # Optimize the design with ABC
-def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeline_stages=0, freq_thresh=0, train_input_txt="train_input.txt", train_output_txt="train_output.txt", test_input_txt="test_input.txt", test_output_txt="test_output.txt", verbose=False):
+def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeline_stages=0, freq_thresh=0, train_input_txt="train_input.txt", train_output_txt="train_output.txt", test_input_txt="test_input.txt", test_output_txt="test_output.txt", bdd_opt_cmd="lnetopt", verbose=False):
     if "ABC_ROOT" not in os.environ:
         raise Exception("The environment variable ABC_ROOT is not defined.")
     abc_path = os.environ["ABC_ROOT"]
@@ -116,7 +116,7 @@ def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeli
         _, output_bitwidth = module_list[i].output_quant.get_scale_factor_bits()
         indices, _, _, _ = module_list[i].neuron_truth_tables[0]
         fanin = len(indices)
-        nodes, tt_pct, time, out, err = optimize_bdd_network(f"aig/layer{i}.aig", f"aig/layer{i}_full.aig", int(input_bitwidth*fanin), int(output_bitwidth), freq_thresh, f"train{i}.sim" if i != 0 else "train.sim", opt_cmd="&lnetopt", working_dir=abc_project_root, verbose=verbose)
+        nodes, tt_pct, time, out, err = optimize_bdd_network(f"aig/layer{i}.aig", f"aig/layer{i}_full.aig", int(input_bitwidth*fanin), int(output_bitwidth), freq_thresh, f"train{i}.sim" if i != 0 else "train.sim", opt_cmd=bdd_opt_cmd, working_dir=abc_project_root, verbose=verbose)
 
     # Technology mapping
     for i in range(len(module_list)):
