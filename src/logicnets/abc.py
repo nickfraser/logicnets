@@ -16,8 +16,10 @@
 import os
 import subprocess
 import re
+import shutil
 
 _aig_re_str = r'and\s+=\s+\d+'
+_lut_re_str = r'nd\s+=\s+\d+'
 _acc_re_str = r'The\s+accuracy\s+is\s+\d+\.\d+'
 _avg_cs_re_str = r'Average\s+care\s+set\s+is\s+\d+\.\d+'
 _elapse_s_re_str = r'elapse:\s+\d+\.\d+'
@@ -109,8 +111,63 @@ def optimize_bdd_network(circuit_file, output_file, input_bitwidth, output_bitwi
         print(err)
     return nodes, tt_pct, time_s, out, err # TODO: return the number of nodes, tt%, time
 
-def tech_map_circuit(circuit_file, output_blif, output_verilog, input_bitwidth, output_bitwidth, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
-    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lnetmap -I {input_bitwidth} -O {output_bitwidth}; write {output_blif}; write_verilog -fm {output_verilog}"]
+def optimize_mfs2(circuit_file, output_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; if -K 6 -a; mfs2; write_blif {output_file}; print_stats"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    lut_re = re.compile(_lut_re_str)
+    nodes = int(lut_re.search(str(out)).group().split(" ")[-1])
+    if verbose:
+        print(nodes)
+        print(out)
+        print(err)
+    return nodes, out, err # TODO: return the number of nodes
+
+def iterative_mfs2_optimize(circuit_file, output_file, tmp_file="tmp.blif", max_loop=100, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    tmp_file_path = tmp_file if working_dir is None else f"{working_dir}/{tmp_file}"
+    output_file_path = output_file if working_dir is None else f"{working_dir}/{output_file}"
+    cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; sweep; write_blif {tmp_file}; print_stats"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    lut_re = re.compile(_lut_re_str)
+    nodes = int(lut_re.search(str(out)).group().split(" ")[-1])
+    best = nodes
+    shutil.copy(tmp_file_path, output_file_path)
+    if verbose:
+        print(nodes)
+        print(best)
+        print(out)
+        print(err)
+    for i in range(max_loop):
+        if i == 0:
+            cmd = [f"{abc_path}/abc", '-c', f"read {tmp_file}; mfs2; write_blif {tmp_file}; print_stats"]
+            proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+            if verbose:
+                print(" ".join(cmd))
+            out, err = proc.communicate()
+            lut_re = re.compile(_lut_re_str)
+            nodes = int(lut_re.search(str(out)).group().split(" ")[-1])
+            if verbose:
+                print(nodes)
+                print(out)
+                print(err)
+        else:
+            nodes, out, err = optimize_mfs2(tmp_file, tmp_file, abc_path=abc_path, working_dir=working_dir, verbose=verbose)
+        if nodes >= best:
+            break
+        else:
+            print(best)
+            best = nodes
+            shutil.copy(tmp_file_path, output_file_path)
+    os.remove(tmp_file_path)
+    return best
+
+def tech_map_circuit(circuit_file, output_blif, input_bitwidth, output_bitwidth, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lnetmap -I {input_bitwidth} -O {output_bitwidth}; write {output_blif}"]
     if verbose:
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
@@ -119,6 +176,34 @@ def tech_map_circuit(circuit_file, output_blif, output_verilog, input_bitwidth, 
         print(out)
         print(err)
     return out, err
+
+def pipeline_tech_mapped_circuit(circuit_file, output_verilog, num_registers, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; ps; pipe -L {num_registers}; ps; retime -M 4; ps; sweep; ps; write_verilog -fm {output_verilog}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    lut_re = re.compile(_lut_re_str)
+    nodes = int(lut_re.search(str(out)).group().split(" ")[-1])
+    if verbose:
+        print(nodes)
+        print(out)
+        print(err)
+    return out, err
+
+def tech_map_to_verilog(circuit_file, output_verilog, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; print_stats; write_verilog -fm {output_verilog}"]
+    if verbose:
+        print(" ".join(cmd))
+    proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
+    out, err = proc.communicate()
+    lut_re = re.compile(_lut_re_str)
+    nodes = int(lut_re.search(str(out)).group().split(" ")[-1])
+    if verbose:
+        print(nodes)
+        print(out)
+        print(err)
+    return nodes, out, err
 
 def evaluate_accuracy(circuit_file, sim_output_file, reference_txt, output_bitwidth, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
     cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lneteval -O {output_bitwidth} {sim_output_file} {reference_txt}"]

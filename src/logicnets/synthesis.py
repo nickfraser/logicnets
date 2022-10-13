@@ -25,7 +25,10 @@ from .abc import    verilog_bench_to_aig,\
                     putontop_blif,\
                     optimize_bdd_network,\
                     evaluate_accuracy,\
-                    tech_map_circuit
+                    tech_map_circuit,\
+                    iterative_mfs2_optimize,\
+                    pipeline_tech_mapped_circuit,\
+                    tech_map_to_verilog
 
 #xcvu9p-flgb2104-2-i
 # TODO: Add option to perform synthesis on a remote server
@@ -126,7 +129,7 @@ def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeli
         _, output_bitwidth = module_list[i].output_quant.get_scale_factor_bits()
         indices, _, _, _ = module_list[i].neuron_truth_tables[0]
         fanin = len(indices)
-        out, err = tech_map_circuit(f"aig/layer{i}_full.aig", f"blif/layer{i}_full.blif", f"veropt/layer{i}_full.v", int(input_bitwidth*fanin), int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
+        out, err = tech_map_circuit(f"aig/layer{i}_full.aig", f"blif/layer{i}_full.blif", int(input_bitwidth*fanin), int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
 
     # Generate monolithic circuits
     if len(module_list) > 1:
@@ -135,6 +138,15 @@ def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeli
     else:
         shutil.copy(f"{aig_dir}/layer0_full.aig", f"{aig_dir}/layers_full.aig")
         shutil.copy(f"{blif_dir}/layer0_full.blif", f"{blif_dir}/layers_full.blif")
+
+    # Generic logic synthesis optimizations
+    nodes = iterative_mfs2_optimize(circuit_file=f"blif/layers_full.blif", output_file=f"blif/layers_full_opt.blif", tmp_file="blif/tmp.blif", max_loop=100, working_dir=abc_project_root, verbose=verbose)
+
+    # Generate verilog, with or without pipelining
+    if pipeline_stages == 0:
+        nodes, out, err = tech_map_to_verilog(circuit_file=f"blif/layers_full_opt.blif", output_verilog=f"veropt/layers_full_opt.v", working_dir=abc_project_root, verbose=verbose)
+    else:
+        nodes, out, err = pipeline_tech_mapped_circuit(circuit_file=f"blif/layers_full_opt.blif", output_verilog=f"veropt/layers_full_opt.v", num_registers=num_registers, working_dir=abc_project_root, verbose=verbose)
 
     # Evaluation
     # Training set:
