@@ -151,11 +151,11 @@ def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeli
     # Evaluation
     # Training set:
     _, output_bitwidth = module_list[-1].output_quant.get_scale_factor_bits()
-    out, err = simulate_circuit(f"aig/layers_full.aig", "train.sim", "train.simo", working_dir=abc_project_root, verbose=verbose)
-    train_accuracy, out, err = evaluate_accuracy(f"aig/layers_full.aig", "train.simo", train_output_txt, int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
+    out, err = simulate_circuit(f"blif/layers_full_opt.blif", "train.sim", "train.simo", working_dir=abc_project_root, verbose=verbose)
+    train_accuracy, out, err = evaluate_accuracy(f"blif/layers_full_opt.blif", "train.simo", train_output_txt, int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
     # Test set:
-    out, err = simulate_circuit(f"aig/layers_full.aig", "test.sim", "test.simo", working_dir=abc_project_root, verbose=verbose)
-    test_accuracy, out, err = evaluate_accuracy(f"aig/layers_full.aig", "test.simo", test_output_txt, int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
+    out, err = simulate_circuit(f"blif/layers_full_opt.blif", "test.sim", "test.simo", working_dir=abc_project_root, verbose=verbose)
+    test_accuracy, out, err = evaluate_accuracy(f"blif/layers_full_opt.blif", "test.simo", test_output_txt, int(output_bitwidth), working_dir=abc_project_root, verbose=verbose)
 
     return train_accuracy, test_accuracy, nodes, average_tt_pcts
 

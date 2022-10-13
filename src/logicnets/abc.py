@@ -50,7 +50,12 @@ def txt_to_sim(txt_file, sim_file, abc_path=os.environ["ABC_ROOT"], working_dir=
     return out, err
 
 def simulate_circuit(circuit_file, sim_input_file, sim_output_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
-    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lnetsim {sim_input_file} {sim_output_file}"]
+    if circuit_file.endswith(".aig"):
+        cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lnetsim {sim_input_file} {sim_output_file}"]
+    elif circuit_file.endswith(".blif"):
+        cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; strash; &get; &lnetsim {sim_input_file} {sim_output_file}"]
+    else:
+        raise ValueError(f"Unsupported file type: {circuit_file}")
     if verbose:
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
@@ -178,7 +183,7 @@ def tech_map_circuit(circuit_file, output_blif, input_bitwidth, output_bitwidth,
     return out, err
 
 def pipeline_tech_mapped_circuit(circuit_file, output_verilog, num_registers, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
-    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; ps; pipe -L {num_registers}; ps; retime -M 4; ps; sweep; ps; write_verilog -fm {output_verilog}"]
+    cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; print_stats; pipe -L {num_registers}; print_stats; retime -M 4; print_stats; sweep; print_stats; write_verilog -fm {output_verilog}"]
     if verbose:
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
@@ -206,7 +211,12 @@ def tech_map_to_verilog(circuit_file, output_verilog, abc_path=os.environ["ABC_R
     return nodes, out, err
 
 def evaluate_accuracy(circuit_file, sim_output_file, reference_txt, output_bitwidth, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
-    cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lneteval -O {output_bitwidth} {sim_output_file} {reference_txt}"]
+    if circuit_file.endswith(".aig"):
+        cmd = [f"{abc_path}/abc", '-c', f"&r {circuit_file}; &lneteval -O {output_bitwidth} {sim_output_file} {reference_txt}"]
+    elif circuit_file.endswith(".blif"):
+        cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; strash; &get; &lneteval -O {output_bitwidth} {sim_output_file} {reference_txt}"]
+    else:
+        raise ValueError(f"Unsupported file type: {circuit_file}")
     if verbose:
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
