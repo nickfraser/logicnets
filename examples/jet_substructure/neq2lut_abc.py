@@ -20,7 +20,8 @@ from torch.utils.data import DataLoader
 
 from logicnets.nn import    generate_truth_tables, \
                             lut_inference, \
-                            module_list_to_verilog_module
+                            module_list_to_verilog_module, \
+                            load_histograms
 from logicnets.synthesis import synthesize_and_get_resource_counts_with_abc
 
 from train import configs, model_config, dataset_config, test
@@ -32,10 +33,12 @@ other_options = {
     "cuda": None,
     "log_dir": None,
     "checkpoint": None,
+    "histograms": None,
+    "freq_thresh": None,
 }
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Synthesize convert a PyTorch trained model into verilog")
+    parser = ArgumentParser(description="Synthesize convert a PyTorch trained model into verilog using ABC")
     parser.add_argument('--arch', type=str, choices=configs.keys(), default="jsc-s",
         help="Specific the neural network model to use (default: %(default)s)")
     parser.add_argument('--batch-size', type=int, default=None, metavar='N',
@@ -66,6 +69,10 @@ if __name__ == "__main__":
         help="A location to store the log output of the training run and the output model (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, required=True,
         help="The checkpoint file which contains the model weights")
+    parser.add_argument('--histograms', type=str, default=None,
+        help="The checkpoint histograms of LUT usage (default: %(default)s)")
+    parser.add_argument('--freq-thresh', type=int, default=None,
+        help="Threshold to use to include this truth table into the model (default: %(default)s)")
     parser.add_argument('--num-registers', type=int, default=0,
         help="The number of registers to add to the generated verilog (default: %(default)s)")
     args = parser.parse_args()
@@ -144,11 +151,18 @@ if __name__ == "__main__":
                     'test_accuracy': lut_accuracy}
 
     torch.save(modelSave, options_cfg["log_dir"] + "/lut_based_model.pth")
+    if options_cfg["histograms"] is not None:
+        luts = torch.load(options_cfg["histograms"])
+        load_histograms(lut_model, luts)
 
     print("Generating verilog in %s..." % (options_cfg["log_dir"]))
     module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], generate_bench=True, add_registers=False)
     print("Top level entity stored at: %s/logicnet.v ..." % (options_cfg["log_dir"]))
 
     print("Running synthesis and verilog technology-mapped verilog in ABC")
-    synthesize_and_get_resource_counts_with_abc(options_cfg["log_dir"], lut_model.module_list, pipeline_stages=args.num_registers, freq_thresh=0)
+    train_accuracy, test_accuracy, nodes, average_care_set_size = synthesize_and_get_resource_counts_with_abc(options_cfg["log_dir"], lut_model.module_list, pipeline_stages=args.num_registers, freq_thresh=args.freq_thresh, train_input_txt="train_input.txt", train_output_txt="train_output.txt", test_input_txt="test_input.txt", test_output_txt="test_output.txt", bdd_opt_cmd="&ttopt", verbose=False)
+    print(f"Training set accuracy(%): {train_accuracy}")
+    print(f"Test set accuracy(%): {test_accuracy}")
+    print(f"LUT6(#): {nodes}")
+    print(f"Average care set sizes(%): {average_care_set_size}")
 
