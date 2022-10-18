@@ -66,7 +66,7 @@ def simulate_circuit(circuit_file, sim_input_file, sim_output_file, abc_path=os.
     return out, err
 
 def putontop_aig(aig_files, output_aig_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
-    cmd = [f"{abc_path}/abc", '-c', f"putontop {' '.join(aig_files)}; st; ps; write {output_aig_file}"]
+    cmd = [f"{abc_path}/abc", '-c', f"putontop {' '.join(aig_files)}; strash; print_stats; write {output_aig_file}"]
     if verbose:
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
@@ -80,13 +80,13 @@ def putontop_aig(aig_files, output_aig_file, abc_path=os.environ["ABC_ROOT"], wo
     return nodes, out, err # TODO: return the number of nodes
 
 def putontop_blif(blif_files, output_blif_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
-    cmd = [f"{abc_path}/abc", '-c', f"putontop {' '.join(blif_files)}; sw; ps; write {output_blif_file}"]
+    cmd = [f"{abc_path}/abc", '-c', f"putontop {' '.join(blif_files)}; sweep; print_stats; write {output_blif_file}"]
     if verbose:
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
     out, err = proc.communicate()
-    aig_re = re.compile(_aig_re_str)
-    nodes = int(aig_re.search(str(out)).group().split(" ")[-1])
+    lut_re = re.compile(_lut_re_str)
+    nodes = int(lut_re.search(str(out)).group().split(" ")[-1])
     if verbose:
         print(nodes)
         print(out)
