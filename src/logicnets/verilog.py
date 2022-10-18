@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import numpy as np
+
 def generate_register_verilog(module_name="myreg", param_name="DataWidth", input_name="data_in", output_name="data_out"):
     register_template = """\
 module {module_name} #(parameter {param_name}=16) (
@@ -90,4 +92,45 @@ def generate_neuron_connection_verilog(input_indices, input_bitwidth):
             if not (i == len(input_indices)-1 and b == 0):
                 connection_string += ", "
     return connection_string
+
+def fix_abc_module_name(input_verilog_file, output_verilog_file, old_module_name, new_module_name, add_timescale: bool = False):
+    with open(input_verilog_file, 'r') as f:
+        lines = f.readlines()
+    with open(output_verilog_file, 'w') as f:
+        if add_timescale:
+            f.write("`timescale 1 ps / 1 ps\n")
+        for l in lines:
+            if l.__contains__(f"module {old_module_name}"):
+                l = f"module {new_module_name}  (\n"
+            f.write(l)
+
+def generate_abc_verilog_wrapper(module_name: str, input_name: str, input_bits: int, output_name: str, output_bits: int, submodule_name: str, num_registers: int, add_timescale: bool = True):
+    abc_wrapper_template = """\
+{timescale}
+module {module_name} (input [{input_bits_1:d}:0] {input_name}, input clk, input rst, output[{output_bits_1:d}:0] {output_name});
+{module_contents}
+endmodule\n"""
+    input_digits = int(np.ceil(np.log10(input_bits)))
+    output_digits = int(np.ceil(np.log10(output_bits)))
+    module_contents = []
+    module_contents.append(f"{submodule_name} {submodule_name}_inst (")
+    # Connect inputs
+    if num_registers > 0:
+        module_contents.append(f"    .clock(clk),")
+    for i in range(input_bits):
+        module_contents.append(f"    .pi{i:0{input_digits}d}({input_name}[{i}]),")
+    for i in range(output_bits):
+        if i < output_bits-1:
+            module_contents.append(f"    .po{i:0{output_digits}d}({output_name}[{i}]),")
+        else:
+            module_contents.append(f"    .po{i:0{output_digits}d}({output_name}[{i}])")
+    module_contents.append(f"    );\n")
+    module_contents = "\n".join(module_contents)
+    return abc_wrapper_template.format( module_name=module_name,
+                                input_name=input_name,
+                                input_bits_1=input_bits-1,
+                                output_name=output_name,
+                                output_bits_1=output_bits-1,
+                                module_contents=module_contents,
+                                timescale="`timescale 1 ps / 1 ps" if add_timescale else "")
 
