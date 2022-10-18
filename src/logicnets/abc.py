@@ -165,7 +165,8 @@ def iterative_mfs2_optimize(circuit_file, output_file, tmp_file="tmp.blif", max_
         if nodes >= best:
             break
         else:
-            print(best)
+            if verbose:
+                print(best)
             best = nodes
             shutil.copy(tmp_file_path, output_file_path)
     os.remove(tmp_file_path)
