@@ -29,6 +29,8 @@ from .abc import    verilog_bench_to_aig,\
                     iterative_mfs2_optimize,\
                     pipeline_tech_mapped_circuit,\
                     tech_map_to_verilog
+from .verilog import    generate_abc_verilog_wrapper,\
+                        fix_abc_module_name
 
 #xcvu9p-flgb2104-2-i
 # TODO: Add option to perform synthesis on a remote server
@@ -147,6 +149,18 @@ def synthesize_and_get_resource_counts_with_abc(verilog_dir, module_list, pipeli
         nodes, out, err = tech_map_to_verilog(circuit_file=f"blif/layers_full_opt.blif", output_verilog=f"veropt/layers_full_opt.v", working_dir=abc_project_root, verbose=verbose)
     else:
         nodes, out, err = pipeline_tech_mapped_circuit(circuit_file=f"blif/layers_full_opt.blif", output_verilog=f"veropt/layers_full_opt.v", num_registers=num_registers, working_dir=abc_project_root, verbose=verbose)
+    fix_abc_module_name(f"{veropt_dir}/layers_full_opt.v", f"{veropt_dir}/layers_full_opt.v", "\\aig", "layers_full_opt", add_timescale=True)
+
+    # Generate top-level entity wrapper
+    _, input_bitwidth = module_list[0].input_quant.get_scale_factor_bits()
+    _, output_bitwidth = module_list[-1].output_quant.get_scale_factor_bits()
+    input_bitwidth, output_bitwidth = int(input_bitwidth), int(output_bitwidth)
+    total_input_bits = module_list[0].in_features*input_bitwidth
+    total_output_bits = module_list[-1].out_features*output_bitwidth
+    module_name="logicnet"
+    veropt_wrapper_str = generate_abc_verilog_wrapper(module_name=module_name, input_name="M0", input_bits=total_input_bits, output_name=f"M{len(module_list)}", output_bits=total_output_bits, submodule_name="layers_full_opt", num_registers=pipeline_stages)
+    with open(f"{veropt_dir}/{module_name}.v", "w") as f:
+        f.write(veropt_wrapper_str)
 
     # Evaluation
     # Training set:
