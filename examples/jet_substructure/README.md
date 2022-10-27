@@ -72,3 +72,32 @@ our paper below:
 }
 ```
 
+## Testing BLIF Files on the JSC Dataset
+
+In this section, we show how to take technology-mapped BLIF files,
+generate technology-mapped verilog and simulate the verilog on the JSC dataset.
+
+### Convert BLIF Files into Verilog
+
+To convert the full BLIF files (as generated from the LogicNets examples, via `neq2lut_abc.py`) into verilog, run the following:
+
+```bash
+python blif2verilog.py --arch <jsc-s|jsc-m|jsc-l> --input-blif <path_to_tech_mapped_blif>/layers_full_opt.blif --output-directory <output_directory>
+```
+
+To convert the layer-wise BLIF files into verilog, run the following:
+
+```bash
+python blif2verilog.py --arch <jsc-s|jsc-m|jsc-l> --input-blifs <path_to_tech_mapped_blif>/*.blif --output-directory <output_directory> --generated-module-name-prefix layer0
+```
+
+Note, the generated module name prefix will likely have to change if the source files are handled in a different way.
+
+### Simulate Verilog
+
+The resultant verilog can be simulated as follows:
+
+```bash
+python simulate_verilog.py --arch <jsc-s|jsc-m|jsc-l> --checkpoint <path_to_checkpoint> --input-verilog <output_directory>/logicnet.v
+```
+
