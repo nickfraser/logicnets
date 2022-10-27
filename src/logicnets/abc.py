@@ -116,8 +116,8 @@ def optimize_bdd_network(circuit_file, output_file, input_bitwidth, output_bitwi
         print(err)
     return nodes, tt_pct, time_s, out, err # TODO: return the number of nodes, tt%, time
 
-def optimize_mfs2(circuit_file, output_file, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
-    cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; if -K 6 -a; mfs2; write_blif {output_file}; print_stats"]
+def optimize_mfs2(circuit_file, output_file, abc_path=os.environ["ABC_ROOT"], command="mfs2", mapping="if -K 6 -a;", working_dir=None, verbose=False):
+    cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; {mapping} {command}; write_blif {output_file}; print_stats"]
     if verbose:
         print(" ".join(cmd))
     proc = subprocess.Popen(cmd, cwd=working_dir, stdout=subprocess.PIPE, env=os.environ)
