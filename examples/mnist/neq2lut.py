@@ -28,7 +28,7 @@ from logicnets.synthesis import synthesize_and_get_resource_counts
 from logicnets.util import proc_postsynth_file
 
 from models import MnistNeqModel, MnistLutModel, MnistVerilogModel
-from train import configs, model_config, dataset_config, test
+from train import configs, model_config, test
 
 other_options = {
     "cuda": None,
@@ -60,12 +60,8 @@ if __name__ == "__main__":
         help="Fanin to use at the output (default: %(default)s)")
     parser.add_argument('--hidden-layers', nargs='+', type=int, default=None,
         help="A list of hidden layer neuron sizes (default: %(default)s)")
-    parser.add_argument('--dataset-file', type=str, default='data/processed-pythia82-lhc13-all-pt1-50k-r1_h022_e0175_t220_nonu_truth.z',
-        help="The file to use as the dataset input (default: %(default)s)")
     parser.add_argument('--clock-period', type=float, default=1.0,
         help="Target clock frequency to use during Vivado synthesis (default: %(default)s)")
-    parser.add_argument('--dataset-config', type=str, default='config/yaml_IP_OP_config.yml',
-        help="The file to use to configure the input dataset (default: %(default)s)")
     parser.add_argument('--dataset-split', type=str, default='test', choices=['train', 'test'],
         help="Dataset to use for evaluation (default: %(default)s)")
     parser.add_argument('--log-dir', type=str, default='./log',
@@ -97,9 +93,6 @@ if __name__ == "__main__":
     model_cfg = {}
     for k in model_config.keys():
         model_cfg[k] = config[k]
-    dataset_cfg = {}
-    for k in dataset_config.keys():
-        dataset_cfg[k] = config[k]
     options_cfg = {}
     for k in other_options.keys():
         if k == 'cuda':

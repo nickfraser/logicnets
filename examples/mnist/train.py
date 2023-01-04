@@ -97,11 +97,6 @@ training_config = {
     "seed": None,
 }
 
-dataset_config = {
-    "dataset_file": None,
-    "dataset_config": None,
-}
-
 other_options = {
     "cuda": None,
     "log_dir": None,
@@ -248,10 +243,6 @@ if __name__ == "__main__":
         help="A list of hidden layer neuron sizes (default: %(default)s)")
     parser.add_argument('--log-dir', type=str, default='./log',
         help="A location to store the log output of the training run and the output model (default: %(default)s)")
-    parser.add_argument('--dataset-file', type=str, default='data/processed-pythia82-lhc13-all-pt1-50k-r1_h022_e0175_t220_nonu_truth.z',
-        help="The file to use as the dataset input (default: %(default)s)")
-    parser.add_argument('--dataset-config', type=str, default='config/yaml_IP_OP_config.yml',
-        help="The file to use to configure the input dataset (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, default=None,
         help="Retrain the model from a previous checkpoint (default: %(default)s)")
     args = parser.parse_args()
@@ -272,9 +263,6 @@ if __name__ == "__main__":
     train_cfg = {}
     for k in training_config.keys():
         train_cfg[k] = config[k]
-    dataset_cfg = {}
-    for k in dataset_config.keys():
-        dataset_cfg[k] = config[k]
     options_cfg = {}
     for k in other_options.keys():
         options_cfg[k] = config[k]
