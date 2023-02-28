@@ -46,6 +46,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 0,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-xs": {
         "hidden_layers": [1024, 1024, 128],
@@ -62,6 +64,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 0,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-s": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
@@ -78,6 +82,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 5,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-s-1.1": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
@@ -94,6 +100,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 18,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-m": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
@@ -110,6 +118,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 2,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-m-1.1": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
@@ -126,6 +136,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 20,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-m-1.2": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
@@ -142,6 +154,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 0,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-l": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
@@ -158,6 +172,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 0,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
     "mnist-l-1.1": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
@@ -174,6 +190,8 @@ configs = {
         "learning_rate": 1e-3,
         "seed": 12,
         "checkpoint": None,
+        "histograms": None,
+        "freq_thresh": None,
     },
 }
 

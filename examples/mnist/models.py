@@ -70,13 +70,15 @@ class MnistNeqModel(nn.Module):
         self.verilog_dir = None
         self.top_module_filename = None
         self.dut = None
+        self.verify = True
         self.logfile = None
 
-    def verilog_inference(self, verilog_dir, top_module_filename, logfile: bool = False, add_registers: bool = False):
+    def verilog_inference(self, verilog_dir, top_module_filename, logfile: bool = False, add_registers: bool = False, verify: bool = True):
         self.verilog_dir = realpath(verilog_dir)
         self.top_module_filename = top_module_filename
-        self.dut = PyVerilator.build(f"{self.verilog_dir}/{self.top_module_filename}", verilog_path=[self.verilog_dir], build_dir=f"{self.verilog_dir}/verilator")
+        self.dut = PyVerilator.build(f"{self.verilog_dir}/{self.top_module_filename}", verilog_path=[self.verilog_dir], build_dir=f"{self.verilog_dir}/verilator", command_args=("--x-assign","0",))
         self.is_verilog_inference = True
+        self.verify = verify
         self.logfile = logfile
         if add_registers:
             self.latency = len(self.num_neurons)
@@ -102,11 +104,8 @@ class MnistNeqModel(nn.Module):
         self.dut.io.clk = 0
         for i in range(x.shape[0]):
             x_i = x[i,:]
-            y_i = self.pytorch_forward(x[i:i+1,:])[0]
             xv_i = list(map(lambda z: input_quant.get_bin_str(z), x_i))
-            ys_i = list(map(lambda z: output_quant.get_bin_str(z), y_i))
             xvc_i = reduce(lambda a,b: a+b, xv_i[::-1])
-            ysc_i = reduce(lambda a,b: a+b, ys_i[::-1])
             self.dut["M0"] = int(xvc_i, 2)
             for j in range(self.latency + 1):
                 #print(self.dut.io.M5)
@@ -114,9 +113,13 @@ class MnistNeqModel(nn.Module):
                 result = f"{res:0{int(total_output_bits)}b}"
                 self.dut.io.clk = 1
                 self.dut.io.clk = 0
-            expected = f"{int(ysc_i,2):0{int(total_output_bits)}b}"
             result = f"{res:0{int(total_output_bits)}b}"
-            assert(expected == result)
+            if self.verify:
+                y_i = self.pytorch_forward(x[i:i+1,:])[0]
+                ys_i = list(map(lambda z: output_quant.get_bin_str(z), y_i))
+                ysc_i = reduce(lambda a,b: a+b, ys_i[::-1])
+                expected = f"{int(ysc_i,2):0{int(total_output_bits)}b}"
+                assert(expected == result)
             res_split = [result[i:i+output_bitwidth] for i in range(0, len(result), output_bitwidth)][::-1]
             yv_i = torch.Tensor(list(map(lambda z: int(z, 2), res_split)))
             y[i,:] = yv_i
