@@ -39,6 +39,7 @@ configs = {
         "input_fanin": 8,
         "hidden_fanin": 8,
         "output_fanin": 8,
+        "input_dropout": 0.01,
         "weight_decay": 1e-3,
         "batch_size": 1024,
         "epochs": 1000,
@@ -54,6 +55,7 @@ configs = {
         "input_fanin": 6,
         "hidden_fanin": 6,
         "output_fanin": 6,
+        "input_dropout": 0.1,
         "weight_decay": 1e-3,
         "batch_size": 1024,
         "epochs": 1000,
@@ -69,6 +71,7 @@ configs = {
         "input_fanin": 10,
         "hidden_fanin": 10,
         "output_fanin": 10,
+        "input_dropout": 0.01,
         "weight_decay": 1e-3,
         "batch_size": 1024,
         "epochs": 1000,
@@ -84,6 +87,7 @@ configs = {
         "input_fanin": 5,
         "hidden_fanin": 5,
         "output_fanin": 5,
+        "input_dropout": 0.1,
         "weight_decay": 1e-3,
         "batch_size": 1024,
         "epochs": 1000,
@@ -99,6 +103,7 @@ configs = {
         "input_fanin": 3,
         "hidden_fanin": 3,
         "output_fanin": 3,
+        "input_dropout": 0.01,
         "weight_decay": 1e-3,
         "batch_size": 1024,
         "epochs": 1000,
@@ -114,6 +119,7 @@ configs = {
         "input_fanin": 12,
         "hidden_fanin": 12,
         "output_fanin": 12,
+        "input_dropout": 0.01,
         "weight_decay": 1e-3,
         "batch_size": 1024,
         "epochs": 1000,
@@ -129,6 +135,7 @@ configs = {
         "input_fanin": 6,
         "hidden_fanin": 6,
         "output_fanin": 6,
+        "input_dropout": 0.1,
         "weight_decay": 1e-3,
         "batch_size": 1024,
         "epochs": 1000,
@@ -147,6 +154,7 @@ model_config = {
     "input_fanin": None,
     "hidden_fanin": None,
     "output_fanin": None,
+    "input_dropout": None,
 }
 
 training_config = {
@@ -301,6 +309,8 @@ if __name__ == "__main__":
         help="Fanin to use at the output (default: %(default)s)")
     parser.add_argument('--hidden-layers', nargs='+', type=int, default=None,
         help="A list of hidden layer neuron sizes (default: %(default)s)")
+    parser.add_argument('--input-dropout', type=float, default=None,
+        help="The amount of dropout to apply at the model input (default: %(default)s)")
     parser.add_argument('--log-dir', type=str, default='./log',
         help="A location to store the log output of the training run and the output model (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, default=None,

@@ -60,6 +60,8 @@ if __name__ == "__main__":
         help="Fanin to use at the output (default: %(default)s)")
     parser.add_argument('--hidden-layers', nargs='+', type=int, default=None,
         help="A list of hidden layer neuron sizes (default: %(default)s)")
+    parser.add_argument('--input-dropout', type=float, default=None,
+        help="The amount of dropout to apply at the model input (default: %(default)s)")
     parser.add_argument('--clock-period', type=float, default=1.0,
         help="Target clock frequency to use during Vivado synthesis (default: %(default)s)")
     parser.add_argument('--dataset-split', type=str, default='test', choices=['train', 'test'],

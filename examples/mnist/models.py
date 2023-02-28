@@ -43,7 +43,7 @@ class MnistNeqModel(nn.Module):
             nn.init.constant_(bn.weight.data, 1)
             nn.init.constant_(bn.bias.data, 0)
             if i == 1:
-                do_in = nn.Dropout(p=0.1)
+                do_in = nn.Dropout(p=model_config["input_dropout"])
                 bn_in = nn.BatchNorm1d(in_features)
                 nn.init.constant_(bn_in.weight.data, 1)
                 nn.init.constant_(bn_in.bias.data, 0)
