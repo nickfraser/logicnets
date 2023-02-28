@@ -31,6 +31,38 @@ from models import MnistNeqModel
 
 # TODO: Replace default configs with YAML files.
 configs = {
+    "mnist-xxs": {
+        "hidden_layers": [1024, 1024, 1024, 128],
+        "input_bitwidth": 1,
+        "hidden_bitwidth": 1,
+        "output_bitwidth": 4,
+        "input_fanin": 8,
+        "hidden_fanin": 8,
+        "output_fanin": 8,
+        "input_dropout": 0.01,
+        "weight_decay": 1e-3,
+        "batch_size": 1024,
+        "epochs": 1000,
+        "learning_rate": 1e-3,
+        "seed": 0,
+        "checkpoint": None,
+    },
+    "mnist-xs": {
+        "hidden_layers": [1024, 1024, 128],
+        "input_bitwidth": 1,
+        "hidden_bitwidth": 1,
+        "output_bitwidth": 4,
+        "input_fanin": 8,
+        "hidden_fanin": 8,
+        "output_fanin": 8,
+        "input_dropout": 0.01,
+        "weight_decay": 1e-3,
+        "batch_size": 1024,
+        "epochs": 1000,
+        "learning_rate": 1e-3,
+        "seed": 0,
+        "checkpoint": None,
+    },
     "mnist-s": {
         "hidden_layers": [1024, 1024, 1024, 1024, 1024, 128],
         "input_bitwidth": 1,
