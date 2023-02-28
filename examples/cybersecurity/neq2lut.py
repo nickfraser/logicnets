@@ -20,7 +20,8 @@ from torch.utils.data import DataLoader
 
 from logicnets.nn import    generate_truth_tables, \
                             lut_inference, \
-                            module_list_to_verilog_module
+                            module_list_to_verilog_module, \
+                            load_histograms
 from logicnets.synthesis import synthesize_and_get_resource_counts
 from logicnets.util import proc_postsynth_file
 
@@ -34,6 +35,8 @@ other_options = {
     "checkpoint": None,
     "generate_bench": False,
     "add_registers": False,
+    "histograms": None,
+    "freq_thresh": None,
     "simulate_pre_synthesis_verilog": False,
     "simulate_post_synthesis_verilog": False,
 }
@@ -68,6 +71,10 @@ if __name__ == "__main__":
         help="A location to store the log output of the training run and the output model (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, required=True,
         help="The checkpoint file which contains the model weights")
+    parser.add_argument('--histograms', type=str, default=None,
+        help="The checkpoint histograms of LUT usage (default: %(default)s)")
+    parser.add_argument('--freq-thresh', type=int, default=None,
+        help="Threshold to use to include this truth table into the model (default: %(default)s)")
     parser.add_argument('--generate-bench', action='store_true', default=False,
         help="Generate the truth table in BENCH format as well as verilog (default: %(default)s)")
     parser.add_argument('--dump-io', action='store_true', default=False,
@@ -141,9 +148,12 @@ if __name__ == "__main__":
                     'test_accuracy': lut_accuracy}
 
     torch.save(modelSave, options_cfg["log_dir"] + "/lut_based_model.pth")
+    if options_cfg["histograms"] is not None:
+        luts = torch.load(options_cfg["histograms"])
+        load_histograms(lut_model, luts)
 
     print("Generating verilog in %s..." % (options_cfg["log_dir"]))
-    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], generate_bench=options_cfg["generate_bench"], add_registers=options_cfg["add_registers"])
+    module_list_to_verilog_module(lut_model.module_list, "logicnet", options_cfg["log_dir"], generate_bench=options_cfg["generate_bench"], add_registers=options_cfg["add_registers"], freq_thresh=options_cfg["freq_thresh"])
     print("Top level entity stored at: %s/logicnet.v ..." % (options_cfg["log_dir"]))
 
     if args.dump_io:
@@ -154,9 +164,10 @@ if __name__ == "__main__":
     else:
         io_filename = None
 
+
     if args.simulate_pre_synthesis_verilog:
         print("Running inference simulation of Verilog-based model...")
-        lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v", logfile=io_filename, add_registers=options_cfg["add_registers"])
+        lut_model.verilog_inference(options_cfg["log_dir"], "logicnet.v", logfile=io_filename, add_registers=options_cfg["add_registers"], verify=options_cfg["freq_thresh"] is None or options_cfg["freq_thresh"] == 0)
         verilog_accuracy = test(lut_model, test_loader, cuda=False)
         print("Verilog-Based Model accuracy: %f" % (verilog_accuracy))
 
@@ -166,7 +177,7 @@ if __name__ == "__main__":
     if args.simulate_post_synthesis_verilog:
         print("Running post-synthesis inference simulation of Verilog-based model...")
         proc_postsynth_file(options_cfg["log_dir"])
-        lut_model.verilog_inference(options_cfg["log_dir"]+"/post_synth", "logicnet_post_synth.v", io_filename, add_registers=options_cfg["add_registers"])
+        lut_model.verilog_inference(options_cfg["log_dir"]+"/post_synth", "logicnet_post_synth.v", io_filename, add_registers=options_cfg["add_registers"], verify=options_cfg["freq_thresh"] is None or options_cfg["freq_thresh"] == 0)
         post_synth_accuracy = test(lut_model, test_loader, cuda=False)
         print("Post-synthesis Verilog-Based Model accuracy: %f" % (post_synth_accuracy))
     
