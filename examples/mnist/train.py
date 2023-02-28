@@ -76,7 +76,7 @@ configs = {
         "batch_size": 1024,
         "epochs": 1000,
         "learning_rate": 1e-3,
-        "seed": 0,
+        "seed": 2,
         "checkpoint": None,
     },
     "mnist-m-1.1": {
