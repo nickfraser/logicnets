@@ -50,6 +50,8 @@ if __name__ == "__main__":
         help="Fanin to use at the output (default: %(default)s)")
     parser.add_argument('--hidden-layers', nargs='+', type=int, default=None,
         help="A list of hidden layer neuron sizes (default: %(default)s)")
+    parser.add_argument('--input-dropout', type=float, default=None,
+        help="The amount of dropout to apply at the model input (default: %(default)s)")
     parser.add_argument('--log-dir', type=str, default='./log',
         help="A location to store the calculated histograms (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, required=True,
