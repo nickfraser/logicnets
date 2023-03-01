@@ -85,11 +85,12 @@ if __name__ == "__main__":
 
     # Fetch the test set
     dataset = {}
-    dataset[args.dataset_split] = MNIST('./data', train=args.dataset_split == "train", download=True, transform=trans)
-    test_loader = DataLoader(dataset[args.dataset_split], batch_size=config['batch_size'], shuffle=False)
+    dataset["train"] = MNIST('./data', train=True, download=True, transform=trans)
+    train_loader = DataLoader(dataset["train"], batch_size=config['batch_size'], shuffle=False)
 
     # Instantiate the PyTorch model
-    x, y = dataset[args.dataset_split][0]
+    x, y = dataset["train"][0]
+    dataset_length = len(dataset['train'])
     model_cfg['input_length'] = len(x)
     model_cfg['output_length'] = 10
     model = MnistNeqModel(model_cfg)
