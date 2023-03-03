@@ -383,6 +383,11 @@ def test(model, dataset_loader, cuda):
     accuracy = 100*float(correct) / len(dataset_loader.dataset)
     return accuracy
 
+def random_rotation(img, degrees):
+    #img.rotate(angle, resample, expand, center, fillcolor=fill)
+    angle = torch.randint(-degrees, degrees+1, (1,)).detach().numpy()
+    return img.rotate(angle, False, False, None, fillcolor=0)
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="LogicNets MNIST Classification Example")
     parser.add_argument('--arch', type=str, choices=configs.keys(), default="mnist-s",
@@ -450,17 +455,27 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(train_cfg['seed'])
         torch.backends.cudnn.deterministic = True
 
-    trans = transform=transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize((0.1307,), (0.3081,)),
-                transforms.Lambda(partial(torch.reshape, shape=(-1,)))
-            ])
+    train_transforms = [
+        transforms.RandomCrop(size=28, padding=1),
+        #transforms.RandomRotation(degrees=7),
+        transforms.Lambda(partial(random_rotation, degrees=4)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+        transforms.Lambda(partial(torch.reshape, shape=(-1,)))
+    ]
+    train_trans = transforms.Compose(train_transforms)
+    inf_transforms = [
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,)),
+        transforms.Lambda(partial(torch.reshape, shape=(-1,)))
+    ]
+    inf_trans = transforms.Compose(inf_transforms)
 
     # Fetch the datasets
     dataset = {}
-    dataset['train'] = MNIST('./data', train=True, download=True, transform=trans)
-    dataset['valid'] = MNIST('./data', train=False, download=True, transform=trans)
-    dataset['test'] = MNIST('./data', train=False, download=True, transform=trans)
+    dataset['train'] = MNIST('./data', train=True, download=True, transform=train_trans)
+    dataset['valid'] = MNIST('./data', train=False, download=True, transform=inf_trans)
+    dataset['test'] = MNIST('./data', train=False, download=True, transform=inf_trans)
 
     # Instantiate model
     x, y = dataset['train'][0]
