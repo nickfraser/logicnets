@@ -277,9 +277,9 @@ other_options = {
 
 def train(model, datasets, train_cfg, options):
     # Create data loaders for training and inference:
-    train_loader = DataLoader(datasets["train"], batch_size=train_cfg['batch_size'], shuffle=True)
-    val_loader = DataLoader(datasets["valid"], batch_size=train_cfg['batch_size'], shuffle=False)
-    test_loader = DataLoader(datasets["test"], batch_size=train_cfg['batch_size'], shuffle=False)
+    train_loader = DataLoader(datasets["train"], batch_size=train_cfg['batch_size'], shuffle=True, num_workers=2)
+    val_loader = DataLoader(datasets["valid"], batch_size=train_cfg['batch_size'], shuffle=False, num_workers=2)
+    test_loader = DataLoader(datasets["test"], batch_size=train_cfg['batch_size'], shuffle=False, num_workers=2)
 
     # Configure optimizer
     weight_decay = train_cfg["weight_decay"]
