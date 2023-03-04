@@ -457,7 +457,7 @@ if __name__ == "__main__":
 
     train_transforms = [
         transforms.RandomCrop(size=28, padding=1),
-        #transforms.RandomRotation(degrees=7),
+        #transforms.RandomRotation(degrees=4),
         transforms.Lambda(partial(random_rotation, degrees=4)),
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
