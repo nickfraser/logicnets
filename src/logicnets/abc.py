@@ -195,7 +195,7 @@ def pipeline_tech_mapped_circuit(circuit_file, output_verilog, num_registers, ab
         print(nodes)
         print(out)
         print(err)
-    return out, err
+    return nodes, out, err
 
 def tech_map_to_verilog(circuit_file, output_verilog, abc_path=os.environ["ABC_ROOT"], working_dir=None, verbose=False):
     cmd = [f"{abc_path}/abc", '-c', f"read {circuit_file}; print_stats; write_verilog -fm {output_verilog}"]
