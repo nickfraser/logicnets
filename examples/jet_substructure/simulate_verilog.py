@@ -99,14 +99,16 @@ if __name__ == "__main__":
     # Test the PyTorch model
     print("Running inference on baseline model...")
     model.eval()
-    baseline_accuracy = test(model, test_loader, cuda=False)
+    baseline_accuracy, baseline_avg_roc_auc = test(model, test_loader, cuda=False)
     print("Baseline accuracy: %f" % (baseline_accuracy))
+    print("Baseline AVG ROC AUC: %f" % (baseline_avg_roc_auc))
 
     verilog_dir = os.path.dirname(options_cfg["input_verilog"])
     filename = os.path.split(options_cfg["input_verilog"])[-1]
     print(f"Running inference simulation of Verilog-based model ({filename})")
     model.verilog_inference(verilog_dir, filename, logfile=None, add_registers=options_cfg["num_registers"] != 0, verify=False)
     model.latency = options_cfg["num_registers"]
-    verilog_accuracy = test(model, test_loader, cuda=False)
+    verilog_accuracy, verilog_avg_roc_auc = test(model, test_loader, cuda=False)
     print("Verilog-Based Model accuracy: %f" % (verilog_accuracy))
+    print("Verilog-Based AVG ROC AUC: %f" % (verilog_avg_roc_auc))
 
