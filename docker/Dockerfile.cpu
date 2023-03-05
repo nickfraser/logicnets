@@ -60,10 +60,10 @@ ENV HOME=/home/$UNAME
 ENV CONDA_ROOT=$HOME/.local/miniconda3
 RUN mkdir -p $CONDA_ROOT
 ENV PATH=$CONDA_ROOT/bin:$PATH
-RUN curl -sSL https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o /tmp/miniconda.sh \
+RUN curl -sSL https://repo.anaconda.com/miniconda/Miniconda3-py38_4.12.0-Linux-x86_64.sh -o /tmp/miniconda.sh \
     && bash /tmp/miniconda.sh -bfp $CONDA_ROOT \
     && rm -rf /tmp/miniconda.sh \
-    && conda install -y python=3 \
+    && conda install -y python=3.8 \
     && conda update -y conda \
     && conda clean --all --yes
 
@@ -90,7 +90,7 @@ RUN conda install -y zsh -c conda-forge && \
 # Install prerequisites for the JSC examples
 RUN conda install -y wget && \
     conda clean -ya
-RUN conda install -y h5py pyyaml numpy pandas scikit-learn tensorboard && \
+RUN conda install -y h5py pyyaml=5 numpy pandas scikit-learn tensorboard && \
     conda clean -ya
 
 # Add entry point script to install LogicNets and setup vivado.
