@@ -105,7 +105,8 @@ if __name__ == "__main__":
     verilog_dir = os.path.dirname(options_cfg["input_verilog"])
     filename = os.path.split(options_cfg["input_verilog"])[-1]
     print(f"Running inference simulation of Verilog-based model ({filename})")
-    model.verilog_inference(verilog_dir, filename, logfile=None, add_registers=options_cfg["num_registers"] == 0, verify=False)
+    model.verilog_inference(verilog_dir, filename, logfile=None, add_registers=options_cfg["num_registers"] != 0, verify=False)
+    model.latency = options_cfg["num_registers"]
     verilog_accuracy = test(model, test_loader, cuda=False)
     print("Verilog-Based Model accuracy: %f" % (verilog_accuracy))
 
