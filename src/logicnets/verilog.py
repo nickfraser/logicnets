@@ -101,7 +101,10 @@ def fix_abc_module_name(input_verilog_file, output_verilog_file, old_module_name
             f.write("`timescale 1 ps / 1 ps\n")
         for l in lines:
             if l.__contains__(f"module {old_module_name}"):
-                l = f"module {new_module_name}  (\n"
+                if add_timescale:
+                    l = f"module {new_module_name}  (clock,\n"
+                else:
+                    l = f"module {new_module_name}  (\n"
             f.write(l)
 
 def generate_abc_verilog_wrapper(module_name: str, input_name: str, input_bits: int, output_name: str, output_bits: int, submodule_name: str, num_registers: int, add_timescale: bool = True):
