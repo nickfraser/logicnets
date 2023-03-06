@@ -14,39 +14,22 @@
 
 import os
 from argparse import ArgumentParser
-from functools import reduce
 
 import torch
 from torch.utils.data import DataLoader
 
-from logicnets.nn import    generate_truth_tables, \
-                            lut_inference, \
-                            module_list_to_verilog_module
-
-from train import configs, model_config, dataset_config, other_options, test
+from train import configs, model_config, dataset_config, test
 from dataset import JetSubstructureDataset
-from models import JetSubstructureNeqModel, JetSubstructureLutModel
-from logicnets.synthesis import synthesize_and_get_resource_counts
+from models import JetSubstructureNeqModel
 
-def dump_io(model, data_loader, input_file, output_file):
-    input_quant = model.module_list[0].input_quant
-    _, input_bitwidth = input_quant.get_scale_factor_bits()
-    input_bitwidth = int(input_bitwidth)
-    total_input_bits = model.module_list[0].in_features*input_bitwidth
-    input_quant.bin_output()
-    with open(input_file, 'w') as i_f, open(output_file, 'w') as o_f:
-        for data, target in data_loader:
-            x = input_quant(data)
-            indices = torch.argmax(target,dim=1)
-            for i in range(x.shape[0]):
-                x_i = x[i,:]
-                xv_i = list(map(lambda z: input_quant.get_bin_str(z), x_i))
-                xvc_i = reduce(lambda a,b: a+b, xv_i[::-1])
-                i_f.write(f"{int(xvc_i,2):0{int(total_input_bits)}b}\n")
-                o_f.write(f"{int(indices[i])}\n")
+other_options = {
+    "checkpoint": None,
+    "input_verilog": None,
+    "num_registers": None,
+}
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="Dump the train and test datasets (after input quantization) into text files")
+    parser = ArgumentParser(description="Synthesize convert a PyTorch trained model into verilog")
     parser.add_argument('--arch', type=str, choices=configs.keys(), default="jsc-s",
         help="Specific the neural network model to use (default: %(default)s)")
     parser.add_argument('--batch-size', type=int, default=None, metavar='N',
@@ -69,10 +52,14 @@ if __name__ == "__main__":
         help="The file to use as the dataset input (default: %(default)s)")
     parser.add_argument('--dataset-config', type=str, default='config/yaml_IP_OP_config.yml',
         help="The file to use to configure the input dataset (default: %(default)s)")
-    parser.add_argument('--log-dir', type=str, default='./log',
-        help="A location to store the output I/O text files (default: %(default)s)")
+    parser.add_argument('--dataset-split', type=str, default='test', choices=['train', 'test'],
+        help="Dataset to use for evaluation (default: %(default)s)")
     parser.add_argument('--checkpoint', type=str, required=True,
         help="The checkpoint file which contains the model weights")
+    parser.add_argument('--input-verilog', type=str, required=True,
+        help="The input verilog file to simulate")
+    parser.add_argument('--num-registers', type=int, default=0,
+        help="The number of pipeline registers in the verilog (default: %(default)s)")
     args = parser.parse_args()
     defaults = configs[args.arch]
     options = vars(args)
@@ -80,9 +67,6 @@ if __name__ == "__main__":
     config = {}
     for k in options.keys():
         config[k] = options[k] if options[k] is not None else defaults[k] # Override defaults, if specified.
-
-    if not os.path.exists(config['log_dir']):
-        os.makedirs(config['log_dir'])
 
     # Split up configuration options to be more understandable
     model_cfg = {}
@@ -99,13 +83,11 @@ if __name__ == "__main__":
 
     # Fetch the test set
     dataset = {}
-    dataset["train"] = JetSubstructureDataset(dataset_cfg['dataset_file'], dataset_cfg['dataset_config'], split="train")
-    dataset["test"] = JetSubstructureDataset(dataset_cfg['dataset_file'], dataset_cfg['dataset_config'], split="test")
-    train_loader = DataLoader(dataset["train"], batch_size=config['batch_size'], shuffle=False)
-    test_loader = DataLoader(dataset["test"], batch_size=config['batch_size'], shuffle=False)
+    dataset[args.dataset_split] = JetSubstructureDataset(dataset_cfg['dataset_file'], dataset_cfg['dataset_config'], split=args.dataset_split)
+    test_loader = DataLoader(dataset[args.dataset_split], batch_size=config['batch_size'], shuffle=False)
 
     # Instantiate the PyTorch model
-    x, y = dataset["train"][0]
+    x, y = dataset[args.dataset_split][0]
     model_cfg['input_length'] = len(x)
     model_cfg['output_length'] = len(y)
     model = JetSubstructureNeqModel(model_cfg)
@@ -121,12 +103,12 @@ if __name__ == "__main__":
     print("Baseline accuracy: %f" % (baseline_accuracy))
     print("Baseline AVG ROC AUC: %f" % (baseline_avg_roc_auc))
 
-    # Run preprocessing on training set.
-    train_input_file = config['log_dir'] + "/train_input.txt"
-    train_output_file = config['log_dir'] + "/train_output.txt"
-    test_input_file = config['log_dir'] + "/test_input.txt"
-    test_output_file = config['log_dir'] + "/test_output.txt"
-    print(f"Dumping train I/O to {train_input_file} and {train_output_file}")
-    dump_io(model, train_loader, train_input_file, train_output_file)
-    print(f"Dumping test I/O to {test_input_file} and {test_output_file}")
-    dump_io(model, test_loader, test_input_file, test_output_file)
+    verilog_dir = os.path.dirname(options_cfg["input_verilog"])
+    filename = os.path.split(options_cfg["input_verilog"])[-1]
+    print(f"Running inference simulation of Verilog-based model ({filename})")
+    model.verilog_inference(verilog_dir, filename, logfile=None, add_registers=options_cfg["num_registers"] != 0, verify=False)
+    model.latency = options_cfg["num_registers"]
+    verilog_accuracy, verilog_avg_roc_auc = test(model, test_loader, cuda=False)
+    print("Verilog-Based Model accuracy: %f" % (verilog_accuracy))
+    print("Verilog-Based AVG ROC AUC: %f" % (verilog_avg_roc_auc))
+

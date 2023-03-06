@@ -41,6 +41,13 @@ ENV OHMYXILINX=/workspace/oh-my-xilinx
 RUN  git clone https://github.com/dirjud/Nitro-Parts-lib-Xilinx.git
 ENV NITROPARTSLIB=/workspace/Nitro-Parts-lib-Xilinx
 
+# Adding LogicNets dependency on ABC
+RUN git clone https://github.com/berkeley-abc/abc.git \
+    && cd abc \
+    && git checkout 813a0f1ff1ae7512cb7947f54cd3f2ab252848c8 \
+    && make -j`nproc`
+ENV ABC_ROOT=/workspace/ABC
+
 # Create the user account to run LogicNets
 RUN groupadd -g $GID $GNAME
 RUN useradd -m -u $UID $UNAME -g $GNAME
