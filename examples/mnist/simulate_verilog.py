@@ -72,9 +72,6 @@ if __name__ == "__main__":
     model_cfg = {}
     for k in model_config.keys():
         model_cfg[k] = config[k]
-    dataset_cfg = {}
-    for k in dataset_config.keys():
-        dataset_cfg[k] = config[k]
     options_cfg = {}
     for k in other_options.keys():
         if k == 'cuda':
