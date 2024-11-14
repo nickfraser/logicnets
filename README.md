@@ -51,7 +51,7 @@ Note, a license is not required to run any of the provided examples.
 ### Manual Installation
 
 A manual installation is not recommended for beginners.
-We will only provide limited support for people wishing to pursue and manual installation.
+We will only provide limited support for people wishing to pursue a manual installation.
 People wanting to pursue a manual installation may want to look at the LogicNets Dockerfile,
 as this contains details for a full environmental setup (including the installation of dependencies of dependencies).
 
@@ -68,7 +68,13 @@ The basic steps for a manual installation are as follows:
 Alternatively, instead of the last step you can clone the LogicNets repository and install as follows:
 
 ```bash
-pip install --upgrade .
+pip install .
+```
+
+Note, to install the dependencies for all the examples, you can run the following:
+
+```bash
+pip install .[example-all]
 ```
 
 ## Examples
