@@ -99,7 +99,7 @@ if __name__ == "__main__":
     # Test the PyTorch model
     print("Running inference of baseline model on training set (%d examples)..." % (dataset_length))
     model.eval()
-    baseline_accuracy, baseline_avg_roc_auc = test(model, test_loader, cuda=False)
+    baseline_accuracy, baseline_avg_roc_auc = test(model, train_loader, cuda=False)
     print("Baseline accuracy: %f" % (baseline_accuracy))
     print("Baseline AVG ROC AUC: %f" % (baseline_avg_roc_auc))
 
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     print("Running inference of LUT-based model training set (%d examples)..." % (dataset_length))
     lut_inference(lut_model, track_used_luts=True)
     lut_model.eval()
-    lut_accuracy, lut_avg_roc_auc = test(lut_model, test_loader, cuda=False)
+    lut_accuracy, lut_avg_roc_auc = test(lut_model, train_loader, cuda=False)
     print("LUT-Based Model accuracy: %f" % (lut_accuracy))
     print("LUT-Based AVG ROC AUC: %f" % (lut_avg_roc_auc))
     print("Saving LUTs to %s... " % (options_cfg["log_dir"] + "/luts.pth"))
