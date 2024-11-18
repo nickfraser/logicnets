@@ -120,7 +120,7 @@ if __name__ == "__main__":
         nodes, out, err = pipeline_tech_mapped_circuit(circuit_file=input_blif, output_verilog=f"layers_full_opt.v", num_registers=options_cfg['num_registers'], working_dir=abc_project_root, verbose=verbose)
 
     # Fix the resultant verilog file so that it can be simulated
-    fix_abc_module_name(f"{veropt_dir}/layers_full_opt.v", f"{veropt_dir}/layers_full_opt.v", options_cfg["generated_module_name_prefix"], "layers_full_opt", add_timescale=True)
+    fix_abc_module_name(f"{veropt_dir}/layers_full_opt.v", f"{veropt_dir}/layers_full_opt.v", options_cfg["generated_module_name_prefix"], "layers_full_opt", add_timescale=options_cfg['num_registers'] != 0)
 
     # Generate top-level entity wrapper
     module_list = model.module_list
