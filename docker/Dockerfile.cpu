@@ -29,7 +29,7 @@ RUN apt-get -qq update && apt-get -qq -y install curl bzip2 \
     && rm -rf /var/lib/apt/lists/* /var/log/dpkg.log
 
 # Install LogicNets system prerequisites
-RUN apt-get -qq update && apt-get -qq -y install verilator build-essential libx11-6 git \
+RUN apt-get -qq update && apt-get -qq -y install verilator build-essential libx11-6 git libreadline-dev \
     && apt-get autoclean \
     && rm -rf /var/lib/apt/lists/* /var/log/dpkg.log
 
@@ -42,11 +42,14 @@ RUN  git clone https://github.com/dirjud/Nitro-Parts-lib-Xilinx.git
 ENV NITROPARTSLIB=/workspace/Nitro-Parts-lib-Xilinx
 
 # Adding LogicNets dependency on ABC
+COPY examples/mnist/abc.patch /workspace/
 RUN git clone https://github.com/berkeley-abc/abc.git \
     && cd abc \
     && git checkout 813a0f1ff1ae7512cb7947f54cd3f2ab252848c8 \
+    && git apply /workspace/abc.patch \
+    && rm -f /workspace/abc.patch \
     && make -j`nproc`
-ENV ABC_ROOT=/workspace/ABC
+ENV ABC_ROOT=/workspace/abc
 
 # Create the user account to run LogicNets
 RUN groupadd -g $GID $GNAME
